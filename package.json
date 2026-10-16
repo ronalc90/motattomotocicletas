@@ -1,0 +1,15 @@
+{
+  "name": "motatto",
+  "private": true,
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "build": "npm run build -w packages/shared && npm run build -w apps/api && npm run build -w apps/web",
+    "build:api": "npm run build -w packages/shared && npm run build -w apps/api",
+    "build:web": "npm run build -w packages/shared && npm run build -w apps/web",
+    "start:api": "npm run start -w apps/api",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "engines": { "node": ">=20" }
+}
