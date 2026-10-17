@@ -89,3 +89,11 @@ GitHub Actions en cada PR: lint, typecheck, tests de API (incluye tests de aisla
 - `docs/` — copia de estas páginas.
 - `apps/api/openapi.yaml` — contrato de la API (se genera desde Zod).
 - `CHANGELOG.md`.
+
+## Estado del despliegue (16 oct 2026)
+- ✅ `https://motattomotocicletas.com` (Vercel) y `www` → redirige al apex.
+- ✅ `https://api.motattomotocicletas.com/health` (Railway, Dockerfile en la raíz del repo).
+- ✅ MongoDB en Railway, base sembrada con el tenant `motatto`.
+- ✅ DNS en Namecheap: A @ → Vercel, CNAME www → Vercel, CNAME api → Railway, TXT `_railway-verify.api`.
+- Cuentas iniciales: dueño de Motatto `dirox7@gmail.com`; superadmin de la plataforma `admin@motattomotocicletas.com` (contraseñas en las variables de Railway; cámbialas desde "Mi cuenta").
+- Pendiente opcional: `ANTHROPIC_API_KEY` en Railway para activar OCR de etiquetas y voz con IA (sin ella funciona el matcher local).
