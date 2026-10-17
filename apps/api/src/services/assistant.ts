@@ -350,7 +350,7 @@ function groundAnswer(p: AssistantProposal, cat: Catalog): AssistantProposal {
   const servs = p.items.filter((i) => i.serviceId).map((i) => cat.services.find((x) => x.id === i.serviceId)!);
   if (!prods.length && !servs.length) {
     // Sin coincidencia en el catálogo: nunca dejar que el modelo afirme precios o stock.
-    return { ...p, answer: `No encontré "${p.unrecognized[0] ?? "ese producto"}" en tu catálogo. Revisa el nombre o agrégalo en Inventario.` };
+    return { ...p, answer: "No encontré ese producto o servicio en tu catálogo. Revisa el nombre o agrégalo en Inventario." };
   }
   const parts = [
     ...prods.map((x) => `${x.name}: ${fmt(x.price)}, ${x.stock > 0 ? `hay ${x.stock} en stock` : "sin stock"}`),
@@ -378,7 +378,11 @@ export async function interpret(
   const ctxLine = context ? `\nContexto en pantalla: ${JSON.stringify(context)}` : "";
   const text_ = await safeAsk(() => askClaude(`Texto dictado: """${text}"""${ctxLine}\nResponde solo el JSON.`, systemPrompt(cat), 2000), "");
   const parsed = extractJson(text_);
-  const result = groundAnswer(sanitize(parsed, cat, local), cat);
+  const grounded = groundAnswer(sanitize(parsed, cat, local), cat);
+  // Si el modelo no ubicó el producto/servicio en el catálogo pero el buscador local sí, usar el local.
+  const priceQuery = grounded.intent === "consultar_precio" || grounded.intent === "consultar_stock";
+  const hasMatch = (p: AssistantProposal) => p.items.some((i) => i.productId || i.serviceId);
+  const result = priceQuery && !hasMatch(grounded) && hasMatch(local) ? groundAnswer(local, cat) : grounded;
   if (context?.customerId && !result.customer?.id) result.customer = local.customer;
   if (context?.vehicleId && !result.vehicle?.id) result.vehicle = local.vehicle;
   return result;
