@@ -31,3 +31,53 @@ button, a { transition-property: color, background-color, border-color, transfor
 @media (prefers-reduced-motion: reduce) {
   main section[data-rv] { opacity: 1; transform: none; }
 }
+
+/* ---- Piezas reutilizables: ruedas, humo, mascota, texto en ola, tarjetas 3D ---- */
+@keyframes fx-spin { to { transform: rotate(360deg); } }
+@keyframes fx-puff {
+  0% { transform: translate(0, 0) scale(0.4); opacity: 0; }
+  15% { opacity: 0.6; }
+  100% { transform: translate(-44px, -40px) scale(2.2); opacity: 0; }
+}
+@keyframes fx-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes fx-blink { 0%, 92%, 100% { transform: scaleY(0); } 95% { transform: scaleY(1); } }
+@keyframes fx-bulb { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+@keyframes fx-pop { from { opacity: 0; transform: scale(0.6) translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes wave-in { from { opacity: 0; transform: translateY(0.6em) rotate(8deg); } to { opacity: 1; transform: none; } }
+@keyframes wave-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-0.07em); } }
+
+.fx-spin { transform-box: fill-box; transform-origin: center; animation: fx-spin 0.8s linear infinite; }
+.fx-puff { transform-box: fill-box; transform-origin: center; animation: fx-puff 1.8s ease-out infinite; }
+
+.fx-mascot { animation: fx-bob 2.6s ease-in-out infinite; cursor: pointer; }
+.fx-mascot .m-body { transition: transform 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.4); }
+.fx-mascot.wheelie .m-body { transform: rotate(-22deg); }
+.fx-mascot.wheelie .fx-spin { animation-duration: 0.25s; }
+.fx-mascot .m-blink { transform-box: fill-box; transform-origin: top; animation: fx-blink 4.2s infinite; }
+.fx-mascot .m-bulb { animation: fx-bulb 1.4s ease-in-out infinite; }
+.fx-bubble { animation: fx-pop 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.3) both 0.4s; }
+
+.wave-ch {
+  display: inline-block;
+  animation: wave-in 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.2) both, wave-bob 2.8s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 35ms), calc(var(--i) * 35ms + 0.7s);
+}
+
+/* Tarjetas con perspectiva: el brillo sigue al cursor */
+main .card { transform-style: preserve-3d; will-change: transform; }
+main .card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: var(--ga, 0);
+  transition: opacity 0.3s ease;
+  background: radial-gradient(circle at var(--gx, 50%) var(--gy, 50%), rgba(255, 255, 255, 0.16), transparent 45%);
+}
+main .card { position: relative; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-mascot, .wave-ch, .fx-spin, .fx-puff, .fx-bubble { animation: none !important; }
+  main .card::after { display: none; }
+}

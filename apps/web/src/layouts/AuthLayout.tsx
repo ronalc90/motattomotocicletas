@@ -1,10 +1,13 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { CursorGlow } from "@/components/fx/CursorGlow";
+import { useFxPointer } from "@/components/fx/useFxPointer";
 import { SUPPORT_EMAIL, SUPPORT_WHATSAPP } from "@/lib/utils";
 
 /** Marco de las pantallas de acceso (ingresar, registrar, invitación): mismo header y pie que el sitio público. */
 export function AuthLayout({ children }: { children: React.ReactNode }) {
+  const { pathname } = useLocation();
+  useFxPointer(pathname);
   return (
     <div className="min-h-dvh flex flex-col bg-slate-50 text-ink dark:bg-ink dark:text-slate-100">
       <CursorGlow />

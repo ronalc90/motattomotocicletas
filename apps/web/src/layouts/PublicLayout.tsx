@@ -4,13 +4,17 @@ import { SiteHeader, siteLinks as links } from "@/components/layout/SiteHeader";
 import { SUPPORT_EMAIL, SUPPORT_WHATSAPP } from "@/lib/utils";
 import { CursorGlow } from "@/components/fx/CursorGlow";
 import { useReveal } from "@/components/fx/useReveal";
+import { useFxPointer } from "@/components/fx/useFxPointer";
+import { ScrollRider } from "@/components/fx/ScrollRider";
 
 export function PublicLayout() {
   const { pathname } = useLocation();
   useReveal(pathname);
+  useFxPointer(pathname);
   return (
     <div className="min-h-dvh flex flex-col bg-white text-ink dark:bg-ink dark:text-slate-100">
       <CursorGlow />
+      <ScrollRider />
       <SiteHeader />
       <main className="flex-1"><Outlet /></main>
       <footer className="border-t border-slate-200 bg-slate-50 dark:bg-ink-2 dark:border-slate-800">

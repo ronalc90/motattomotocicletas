@@ -2,6 +2,8 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Boxes, Camera, CheckSquare, FileDown, MessageCircle, Mic, PieChart, Shield, Wallet } from "lucide-react";
 import { Button } from "@/components/ui";
 import { ParticleField } from "@/components/fx/ParticleField";
+import { WaveText } from "@/components/fx/WaveText";
+import { Mascot } from "@/components/fx/Mascot";
 
 const FEATURES = [
   { icon: FileDown, title: "Factura y descarga el PDF", text: "Cuenta de cobro con el formato que tus clientes ya conocen: texto, PDF y link público." },
@@ -30,13 +32,14 @@ export function Landing() {
         <div className="relative mx-auto max-w-6xl px-4 py-16 sm:py-24 grid lg:grid-cols-[1.1fr_0.9fr] gap-10 items-center">
           <div>
             <p className="text-amber font-semibold text-sm mb-3">Para talleres de motos y carros en Colombia</p>
-            <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.05] tracking-tight">Tu taller al día desde el celular.</h1>
+            <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.05] tracking-tight"><WaveText text="Tu taller al día desde el celular." /></h1>
             <p className="mt-5 text-lg text-slate-300 max-w-xl leading-relaxed">Cuentas de cobro, inventario con fotos, clientes y caja. Dicta la factura por voz y envíala por WhatsApp antes de que el cliente se baje de la moto.</p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
-              <Link to="/registro"><Button size="lg" full icon={<ArrowRight className="h-5 w-5" />}>Registrar mi taller gratis</Button></Link>
+              <Link to="/registro" data-magnet className="inline-block"><Button size="lg" full icon={<ArrowRight className="h-5 w-5" />}>Registrar mi taller gratis</Button></Link>
               <Link to="/como-funciona"><Button size="lg" variant="outline" full className="border-white/30 text-white hover:bg-white/10">Ver cómo funciona</Button></Link>
             </div>
             <p className="mt-4 text-sm text-slate-400">Sin tarjeta. Plan gratis con 200 facturas al mes.</p>
+            <div className="mt-8"><Mascot message="¡Arranquemos!" /></div>
           </div>
           <HeroInvoice />
         </div>
