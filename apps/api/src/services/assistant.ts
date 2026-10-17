@@ -1,12 +1,12 @@
 import type { Types } from "mongoose";
-import type { AssistantProposal, ItemType } from "@motatto/shared";
-import { Customer, Product, Service, Vehicle } from "../models/index.js";
+import { PRODUCT_CATEGORIES, type AssistantAction, type AssistantProposal, type ItemType, type ProductCategory, type VehicleKind } from "@motatto/shared";
+import { Customer, Order, Product, Service, Vehicle } from "../models/index.js";
 import { normalize } from "../lib/text.js";
 import { aiEnabled, askClaude, extractJson, safeAsk } from "./ai.js";
 import { parseSpanishNumber, splitPrice } from "./spanishNumbers.js";
 
 interface Catalog {
-  products: Array<{ id: string; name: string; reference: string; price: number; stock: number; compatibleWith: string[] }>;
+  products: Array<{ id: string; name: string; reference: string; price: number; stock: number; minStock: number; compatibleWith: string[] }>;
   services: Array<{ id: string; name: string; suggestedPrice: number }>;
   customers: Array<{ id: string; name: string; phone: string }>;
   vehicles: Array<{ id: string; customerId: string; brand: string; model: string; plate: string }>;
@@ -14,13 +14,13 @@ interface Catalog {
 
 export async function loadCatalog(tenantId: Types.ObjectId): Promise<Catalog> {
   const [products, services, customers, vehicles] = await Promise.all([
-    Product.find({ tenantId, active: true }).select("name reference price stock compatibleWith").limit(1500),
+    Product.find({ tenantId, active: true }).select("name reference price stock minStock compatibleWith").limit(1500),
     Service.find({ tenantId, active: true }).select("name suggestedPrice").limit(500),
     Customer.find({ tenantId }).sort({ updatedAt: -1 }).select("name phone").limit(300),
     Vehicle.find({ tenantId }).sort({ updatedAt: -1 }).select("customerId brand model plate").limit(400),
   ]);
   return {
-    products: products.map((p) => ({ id: String(p._id), name: p.name, reference: p.reference, price: p.price, stock: p.stock, compatibleWith: p.compatibleWith })),
+    products: products.map((p) => ({ id: String(p._id), name: p.name, reference: p.reference, price: p.price, stock: p.stock, minStock: p.minStock, compatibleWith: p.compatibleWith })),
     services: services.map((s) => ({ id: String(s._id), name: s.name, suggestedPrice: s.suggestedPrice })),
     customers: customers.map((c) => ({ id: String(c._id), name: c.name, phone: c.phone })),
     vehicles: vehicles.map((v) => ({ id: String(v._id), customerId: String(v.customerId), brand: v.brand, model: v.model, plate: v.plate })),
@@ -179,6 +179,18 @@ export function interpretLocally(text: string, cat: Catalog): AssistantProposal 
     };
   }
 
+  if (/\b(inventario|bajo de stock|poco stock|se me acaba|agotad)/.test(n) && !/cuanto (vale|cuesta)/.test(n)) {
+    const accion = inventoryAction(cat);
+    const list = accion.lowStock.slice(0, 8).map((x) => `${x.name} (${x.stock} de mínimo ${x.minStock})`).join(", ");
+    return {
+      intent: "consultar_inventario",
+      answer: accion.lowStock.length ? `Tienes ${accion.total} productos activos. Bajo de stock o agotados: ${accion.lowStock.length}: ${list}.` : `Tienes ${accion.total} productos activos y ninguno está bajo de stock.`,
+      items: [],
+      unrecognized: [],
+      accion,
+    };
+  }
+
   const askPrice = /cuanto (vale|cuesta|es|sale)|precio de|que precio|a como/.test(n);
   const askStock = /\b(hay|stock|cuantos|cuantas|quedan|tenemos|tengo)\b/.test(n) && !/cambio/.test(n);
   if (askPrice || askStock) {
@@ -240,14 +252,30 @@ export function interpretLocally(text: string, cat: Catalog): AssistantProposal 
 
 // ---------------- Claude ----------------
 
+/**
+ * Selects the tenant data relevant to this utterance, so the model sees ~40 items instead of the whole catalog.
+ * Keeps the full catalog for grounding; this only trims what is sent to the model (cost + focus).
+ */
+export function retrieveCandidates(text: string, cat: Catalog): Catalog {
+  const score = (name: string, extra = "") => similarity(text, `${name} ${extra}`);
+  const top = <T,>(items: T[], f: (x: T) => number, n: number) =>
+    items.map((x) => ({ x, s: f(x) })).filter((r) => r.s > 0.2).sort((a, b) => b.s - a.s).slice(0, n).map((r) => r.x);
+  const products = top(cat.products, (p) => score(p.name, `${p.reference} ${p.compatibleWith.join(" ")}`), 25);
+  const services = top(cat.services, (s) => score(s.name), 12);
+  const customers = top(cat.customers, (c) => score(c.name, c.phone), 6);
+  const plates = normalize(text).replace(/\s+/g, "");
+  const vehicles = cat.vehicles.filter((v) => (v.plate && plates.includes(normalize(v.plate).replace(/\s+/g, ""))) || customers.some((c) => c.id === v.customerId) || score(`${v.brand} ${v.model}`) > 0.4).slice(0, 8);
+  return { ...cat, products, services, customers, vehicles };
+}
+
 function systemPrompt(cat: Catalog): string {
-  const products = cat.products.slice(0, 600).map((p) => `- id=${p.id} | ${p.name}${p.reference ? ` (ref ${p.reference})` : ""} | precio ${p.price} | stock ${p.stock}${p.compatibleWith.length ? ` | compatible: ${p.compatibleWith.join(", ")}` : ""}`).join("\n");
+  const products = cat.products.map((p) => `- id=${p.id} | ${p.name}${p.reference ? ` (ref ${p.reference})` : ""} | precio ${p.price} | stock ${p.stock}${p.compatibleWith.length ? ` | compatible: ${p.compatibleWith.join(", ")}` : ""}`).join("\n");
   const services = cat.services.map((s) => `- id=${s.id} | ${s.name} | precio ${s.suggestedPrice}`).join("\n");
   const customers = cat.customers.slice(0, 150).map((c) => `- id=${c.id} | ${c.name}${c.phone ? ` | ${c.phone}` : ""}`).join("\n");
   const vehicles = cat.vehicles.slice(0, 200).map((v) => `- id=${v.id} | cliente=${v.customerId} | ${v.brand} ${v.model}${v.plate ? ` | placa ${v.plate}` : ""}`).join("\n");
   return `Eres el asistente de un taller de motos/carros en Colombia. Interpretas lo que dicta el mecánico o cajero (español colombiano: "pastillas", "kit de arrastre", "cunas", "purgada", "pinta", "lucas"=mil pesos) y respondes SOLO con un JSON válido con esta forma exacta:
 {
-  "intent": "crear_orden" | "consultar_precio" | "consultar_stock" | "buscar_vehiculo" | "desconocido",
+  "intent": "crear_orden" | "consultar_precio" | "consultar_stock" | "buscar_vehiculo" | "crear_producto" | "crear_cliente" | "entrada_stock" | "imprimir_factura" | "consultar_inventario" | "desconocido",
   "answer": "respuesta corta en español para mostrar/leer en voz alta",
   "customer": { "id": "id del catálogo si coincide", "name": "...", "phone": "..." } | null,
   "vehicle": { "id": "id si coincide", "brand": "...", "model": "...", "plate": "..." } | null,
@@ -255,9 +283,17 @@ function systemPrompt(cat: Catalog): string {
   "unrecognized": ["fragmentos que no pudiste interpretar"],
   "discount": 0,
   "km": null,
-  "description": "problema o trabajo solicitado si lo dictan, si no null"
+  "description": "problema o trabajo solicitado si lo dictan, si no null",
+  "accion": null | { "tipo": "crear_producto" | "crear_cliente" | "entrada_stock" | "imprimir_factura", "nombre": "...", "referencia": "...", "marca": "...", "categoria": "una de: ${PRODUCT_CATEGORIES.join(", ")}", "precio": 0, "costo": 0, "stock": 0, "stock_minimo": 0, "telefono": "...", "vehiculo": { "tipo": "moto" | "carro", "marca": "...", "modelo": "...", "placa": "..." }, "producto_id": "id del catálogo o null", "cantidad": 1, "costo_unitario": 0, "numero_factura": "MT-AAAA-NNNN" }
 }
 Reglas:
+- Acciones (campo "accion"; el taller confirma antes de guardar, tú SOLO propones, nunca digas que ya quedó creado):
+  - "crea/agrega un producto X a 30 mil, stock 5" → intent crear_producto, accion tipo crear_producto (nombre, precio, costo, stock, categoría, marca/referencia si las dicen). answer: "Propongo crear X a $P con stock S. ¿Lo creo?"
+  - "agrega el cliente Juan, cel 300..., moto Pulsar, placa ABC12D" → intent crear_cliente, accion tipo crear_cliente con vehiculo (si dicen marca y modelo). La placa va en vehiculo.placa.
+  - "llegaron 4 bujías NS 200" / "entró N de X al inventario" → intent entrada_stock, accion tipo entrada_stock con producto_id del catálogo si coincide, cantidad N, costo_unitario si lo dicen.
+  - "imprime / manda / muestra la factura MT-2026-0001" → intent imprimir_factura, accion numero_factura.
+  - "qué hay bajo de stock / cómo va el inventario / qué se me acaba" → intent consultar_inventario, accion null (el servidor responde con datos reales).
+  - Si no es una acción, accion es null.
 - Usa los precios del catálogo salvo que el usuario diga un precio ("a treinta y dos mil" = 32000, "26 mil" = 26000, "veintiséis mil" = 26000, "80 lucas" = 80000).
 - Repuestos → type "repuesto" con productId. Servicios/mano de obra → "servicio" con serviceId. Lo que no esté en el catálogo → "otro" sin id (aunque sea mano de obra), unitPrice 0 si no se dijo precio, y agrégalo a unrecognized para que el usuario lo complete.
 - Un repuesto y su mano de obra son DOS líneas distintas: "cambio de batería, batería a 280 mil" = línea servicio "Cambio de batería" + línea repuesto/otro "Batería" 280000. "Cambio de aceite y filtro" es UN servicio del catálogo; si además dice "aceite" o "filtro" como repuesto, esos son líneas de repuesto aparte.
@@ -280,7 +316,64 @@ VEHÍCULOS RECIENTES:
 ${vehicles || "(ninguno)"}`;
 }
 
-const INTENTS = new Set(["crear_orden", "consultar_precio", "consultar_stock", "buscar_vehiculo", "desconocido"]);
+const INTENTS = new Set([
+  "crear_orden",
+  "consultar_precio",
+  "consultar_stock",
+  "buscar_vehiculo",
+  "crear_producto",
+  "crear_cliente",
+  "entrada_stock",
+  "imprimir_factura",
+  "consultar_inventario",
+  "desconocido",
+]);
+
+/** Validates a proposed action against the catalog and the input rules. Returns undefined when unusable. */
+function sanitizeAction(raw: unknown, cat: Catalog): AssistantAction | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const a = raw as Record<string, unknown>;
+  const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
+  const num = (v: unknown) => Math.max(0, Math.round(Number(v) || 0));
+  const tipo = String(a.tipo ?? "");
+  if (tipo === "crear_producto") {
+    const name = str(a.nombre);
+    if (!name) return undefined;
+    const category: ProductCategory = PRODUCT_CATEGORIES.includes(a.categoria as ProductCategory) ? (a.categoria as ProductCategory) : "otro";
+    return { kind: "crear_producto", name, reference: str(a.referencia), brand: str(a.marca), category, price: num(a.precio), cost: num(a.costo), stock: num(a.stock), minStock: num(a.stock_minimo) };
+  }
+  if (tipo === "crear_cliente") {
+    const name = str(a.nombre);
+    if (!name) return undefined;
+    const v = a.vehiculo && typeof a.vehiculo === "object" ? (a.vehiculo as Record<string, unknown>) : null;
+    const brand = v ? str(v.marca) : undefined;
+    const model = v ? str(v.modelo) : undefined;
+    const plate = v ? str(v.placa)?.toUpperCase().replace(/\s+/g, "") : undefined;
+    const vehicle = brand && model ? { kind: (v?.tipo === "carro" ? "carro" : "moto") as VehicleKind, brand, model, plate } : undefined;
+    return { kind: "crear_cliente", name, phone: str(a.telefono), vehicle };
+  }
+  if (tipo === "entrada_stock") {
+    let productId = typeof a.producto_id === "string" && cat.products.some((p) => p.id === a.producto_id) ? a.producto_id : undefined;
+    const name = productId ? cat.products.find((p) => p.id === productId)!.name : str(a.nombre);
+    if (!name) return undefined;
+    if (!productId) {
+      const m = bestMatch(name, cat);
+      if (m && m.kind === "product" && m.score >= 0.6) productId = m.p.id;
+    }
+    return { kind: "entrada_stock", productId, productName: productId ? cat.products.find((p) => p.id === productId)!.name : name, qty: num(a.cantidad) || 1, unitCost: num(a.costo_unitario) || undefined };
+  }
+  if (tipo === "imprimir_factura") {
+    const number = str(a.numero_factura);
+    return number ? { kind: "imprimir_factura", number: number.toUpperCase() } : undefined;
+  }
+  return undefined;
+}
+
+/** Inventory summary computed from the catalog, never from the model. */
+function inventoryAction(cat: Catalog): Extract<AssistantAction, { kind: "consultar_inventario" }> {
+  const lowStock = cat.products.filter((p) => p.stock <= p.minStock).map((p) => ({ name: p.name, stock: p.stock, minStock: p.minStock }));
+  return { kind: "consultar_inventario", total: cat.products.length, lowStock };
+}
 
 function sanitize(raw: unknown, cat: Catalog, fallback: AssistantProposal): AssistantProposal {
   if (!raw || typeof raw !== "object") return fallback;
@@ -326,12 +419,21 @@ function sanitize(raw: unknown, cat: Catalog, fallback: AssistantProposal): Assi
     discount: Math.max(0, Math.round(Number(r.discount) || 0)) || undefined,
     km: Number(r.km) > 0 ? Math.round(Number(r.km)) : undefined,
     description: typeof r.description === "string" && r.description.trim() ? r.description.trim() : undefined,
+    accion: sanitizeAction(r.accion, cat),
   };
 }
 
 /** For price/stock questions, rebuild the answer from the catalog so numbers are never hallucinated. */
 function groundAnswer(p: AssistantProposal, cat: Catalog): AssistantProposal {
   const fmt = (n: number) => `$${n.toLocaleString("es-CO")}`;
+  if (p.intent === "consultar_inventario") {
+    const accion = inventoryAction(cat);
+    const list = accion.lowStock.slice(0, 8).map((x) => `${x.name} (${x.stock} de mínimo ${x.minStock})`).join(", ");
+    const answer = accion.lowStock.length
+      ? `Tienes ${accion.total} productos activos. Bajo de stock o agotados: ${accion.lowStock.length}: ${list}.`
+      : `Tienes ${accion.total} productos activos y ninguno está bajo de stock.`;
+    return { ...p, accion, answer };
+  }
   if (p.intent === "crear_orden") {
     if (!p.items.length) return p;
     const subtotal = p.items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
@@ -374,15 +476,25 @@ export async function interpret(
     const v = cat.vehicles.find((x) => x.id === context.vehicleId);
     if (v) local.vehicle = { id: v.id, brand: v.brand, model: v.model, plate: v.plate };
   }
-  if (!aiEnabled()) return local;
+  // Ahorro de créditos: si el buscador local resolvió una consulta sencilla, no se llama al modelo.
+  const resolvedLocally =
+    (local.intent === "consultar_precio" || local.intent === "consultar_stock") && local.items.some((i) => i.productId || i.serviceId) ||
+    local.intent === "consultar_inventario" ||
+    (local.intent === "buscar_vehiculo" && !!local.vehicle?.id);
+  if (!aiEnabled() || resolvedLocally) return local;
   const ctxLine = context ? `\nContexto en pantalla: ${JSON.stringify(context)}` : "";
-  const text_ = await safeAsk(() => askClaude(`Texto dictado: """${text}"""${ctxLine}\nResponde solo el JSON.`, systemPrompt(cat), 2000), "");
+  const text_ = await safeAsk(() => askClaude(`Texto dictado: """${text}"""${ctxLine}\nResponde solo el JSON.`, systemPrompt(retrieveCandidates(text, cat)), 2000), "");
   const parsed = extractJson(text_);
   const grounded = groundAnswer(sanitize(parsed, cat, local), cat);
   // Si el modelo no ubicó el producto/servicio en el catálogo pero el buscador local sí, usar el local.
   const priceQuery = grounded.intent === "consultar_precio" || grounded.intent === "consultar_stock";
   const hasMatch = (p: AssistantProposal) => p.items.some((i) => i.productId || i.serviceId);
   const result = priceQuery && !hasMatch(grounded) && hasMatch(local) ? groundAnswer(local, cat) : grounded;
+  if (result.accion?.kind === "imprimir_factura") {
+    const order = await Order.findOne({ tenantId, number: result.accion.number }).select("_id").lean();
+    if (order) result.accion = { ...result.accion, orderId: String(order._id) };
+    else result.answer = `No encontré la factura ${result.accion.number} en tu taller.`;
+  }
   if (context?.customerId && !result.customer?.id) result.customer = local.customer;
   if (context?.vehicleId && !result.vehicle?.id) result.vehicle = local.vehicle;
   return result;

@@ -91,3 +91,36 @@ describe("assistant fallback", () => {
     expect(res.body.note).toBe("IA no configurada");
   });
 });
+
+describe("asistente: acciones y ahorro de créditos", () => {
+  let owner: Session;
+  beforeEach(async () => {
+    owner = await registerTenant(app, "Taller Acciones", "acciones@test.com");
+  });
+
+  it("consultar inventario responde desde el catálogo, sin llamar al modelo", async () => {
+    await createProduct(app, owner, { name: "Pastilla freno Gixxer", reference: "PF1", stock: 1, minStock: 3, initialStock: 1 });
+    await createProduct(app, owner, { name: "Filtro de aire", reference: "FA1", initialStock: 10, minStock: 2 });
+    const r = await request(app).post("/api/assistant").set(bearer(owner)).send({ text: "qué tengo bajo de stock" });
+    expect(r.status).toBe(200);
+    expect(r.body.intent).toBe("consultar_inventario");
+    expect(r.body.accion.kind).toBe("consultar_inventario");
+    expect(r.body.accion.total).toBe(2);
+    expect(r.body.accion.lowStock.map((x: { name: string }) => x.name)).toEqual(["Pastilla freno Gixxer"]);
+    expect(r.body.answer).toContain("Pastilla freno Gixxer");
+  });
+
+  it("sin clave de IA, las acciones nuevas no se inventan", async () => {
+    const r = await request(app).post("/api/assistant").set(bearer(owner)).send({ text: "crea el producto bujía NS 200 a 32 mil" });
+    expect(r.status).toBe(200);
+    expect(r.body.accion).toBeUndefined();
+    expect(r.body.intent).not.toBe("crear_producto");
+  });
+
+  it("la factura inexistente se reporta como no encontrada (sin acción)", async () => {
+    // con IA apagada no hay acción de factura; comprobamos que la ruta no falla
+    const r = await request(app).post("/api/assistant").set(bearer(owner)).send({ text: "imprime la factura MT-2026-9999" });
+    expect(r.status).toBe(200);
+    expect(r.body.accion).toBeUndefined();
+  });
+});

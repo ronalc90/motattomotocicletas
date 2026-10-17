@@ -7,6 +7,7 @@ import { api, errorMessage } from "@/lib/api";
 import { speak, useSpeech } from "@/hooks/useSpeech";
 import { Badge, Button, MoneyInput } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { ActionCard } from "./AssistantActions";
 
 export interface ProposedItem { type: ItemType; productId?: string; serviceId?: string; description: string; qty: number; unitPrice: number; confidence: number; matchedName?: string }
 
@@ -58,6 +59,8 @@ export function AssistantPanel({ context, onUseItems, useLabel = "Crear orden co
               <li>“Moto de Ronal, la Gixxer: kit de arrastre, cambio de kit y purga de frenos”</li>
               <li>“¿Cuánto vale la bujía de NS 200?”</li>
               <li>“¿Qué le hicimos a la placa ABC123?”</li>
+              <li>“Llegaron 4 bujías NS 200”, “agrega el cliente Juan, moto Pulsar, placa ABC12D”</li>
+              <li>“¿Qué tengo bajo de stock?”, “imprime la factura MT-2026-0001”</li>
             </ul>
           </div>
         )}
@@ -70,6 +73,7 @@ export function AssistantPanel({ context, onUseItems, useLabel = "Crear orden co
                 {t.proposal.vehicle && <Badge tone={t.proposal.vehicle.id ? "ok" : "amber"}>{[t.proposal.vehicle.brand, t.proposal.vehicle.model, t.proposal.vehicle.plate].filter(Boolean).join(" ")}</Badge>}
               </div>
             )}
+            {t.proposal?.accion && <ActionCard action={t.proposal.accion} />}
             {t.proposal && t.proposal.unrecognized.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">{t.proposal.unrecognized.map((u) => <Badge key={u} tone="bad">No entendí: {u}</Badge>)}</div>
             )}

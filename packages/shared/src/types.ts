@@ -271,9 +271,29 @@ export interface PublicInvoice {
   warrantyUntil?: string;
 }
 
+/** Actions the assistant proposes; the user confirms each one in the UI before anything is saved. */
+export type AssistantAction =
+  | { kind: "crear_producto"; name: string; reference?: string; brand?: string; category: ProductCategory; price: number; cost: number; stock: number; minStock: number }
+  | { kind: "crear_cliente"; name: string; phone?: string; vehicle?: { kind: VehicleKind; brand: string; model: string; plate?: string } }
+  | { kind: "entrada_stock"; productId?: string; productName: string; qty: number; unitCost?: number }
+  | { kind: "imprimir_factura"; orderId?: string; number: string }
+  | { kind: "consultar_inventario"; total: number; lowStock: Array<{ name: string; stock: number; minStock: number }> };
+
 /** Result of interpreting a voice/text command. */
 export interface AssistantProposal {
-  intent: "crear_orden" | "consultar_precio" | "consultar_stock" | "buscar_vehiculo" | "desconocido";
+  intent:
+    | "crear_orden"
+    | "consultar_precio"
+    | "consultar_stock"
+    | "buscar_vehiculo"
+    | "crear_producto"
+    | "crear_cliente"
+    | "entrada_stock"
+    | "imprimir_factura"
+    | "consultar_inventario"
+    | "desconocido";
+  /** Set for the non-order actions (see AssistantAction). */
+  accion?: AssistantAction;
   answer: string; // human-readable response, shown and optionally spoken
   customer?: { id?: string; name: string; phone?: string };
   vehicle?: { id?: string; brand?: string; model?: string; plate?: string };
