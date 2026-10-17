@@ -23,6 +23,7 @@ import { dashboardRouter } from "./routes/dashboard.js";
 import { reportsRouter } from "./routes/reports.js";
 import { assistantRouter } from "./routes/assistant.js";
 import { auditRouter, uploadsRouter } from "./routes/misc.js";
+import { filesRouter } from "./routes/files.js";
 import { superadminRouter } from "./routes/superadmin.js";
 
 export function createApp() {
@@ -61,6 +62,7 @@ export function createApp() {
 
   // Tenant routes (auth required)
   app.use("/api", auth);
+  app.use("/api/files", filesRouter);
   app.use("/api/tenant", tenantRouter);
   app.use("/api/users", usersRouter);
   app.use("/api/dashboard", dashboardRouter);

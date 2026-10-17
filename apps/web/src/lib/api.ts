@@ -97,6 +97,8 @@ export function apiFileUrl(path: string, query?: Query): string {
 export function assetUrl(url?: string | null): string | undefined {
   if (!url) return undefined;
   if (/^https?:\/\//i.test(url) || url.startsWith("data:") || url.startsWith("blob:")) return url;
+  // Fotos privadas de R2: se piden a la API con el token de sesión (como los PDF).
+  if (url.startsWith("/api/files/")) return apiFileUrl(url.slice("/api".length));
   return `${API_URL}${url.startsWith("/") ? "" : "/"}${url}`;
 }
 

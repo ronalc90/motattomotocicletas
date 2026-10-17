@@ -49,7 +49,32 @@ export function extFor(mime: string, originalName?: string): string {
   return m ? m[1].toLowerCase() : "bin";
 }
 
-/** Stores a file and returns its public URL. R2 when configured, else local disk under /uploads. */
+/** True when an R2 key belongs to this tenant (keys are tenants/<tenantId>/...). */
+export function keyBelongsTo(tenantId: string, key: string): boolean {
+  return key.startsWith(`tenants/${tenantId}/`) && !key.includes("..");
+}
+
+async function r2Client() {
+  const { S3Client } = await import("@aws-sdk/client-s3");
+  return new S3Client({
+    region: "auto",
+    endpoint: `https://${config.r2.accountId}.r2.cloudflarestorage.com`,
+    credentials: { accessKeyId: config.r2.accessKeyId, secretAccessKey: config.r2.secretAccessKey },
+  });
+}
+
+/** Reads a private R2 object (the bucket is not public; the API serves it after checking the tenant). */
+export async function readFile(key: string): Promise<{ body: Buffer; contentType?: string }> {
+  const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+  const out = await (await r2Client()).send(new GetObjectCommand({ Bucket: config.r2.bucket, Key: key }));
+  if (!out.Body) throw new Error("empty object");
+  return { body: Buffer.from(await out.Body.transformToByteArray()), contentType: out.ContentType };
+}
+
+/**
+ * Stores a file and returns its URL. With R2 the bucket is private: the URL is /api/files/<key>,
+ * served by the API after checking the tenant. Without R2, files go to local disk under /uploads.
+ */
 export async function storeFile(
   tenantId: string,
   file: { buffer: Buffer; mimetype: string; originalname?: string },
@@ -57,16 +82,11 @@ export async function storeFile(
 ): Promise<string> {
   const key = `tenants/${tenantId}/${folder}/${nanoid(16)}.${extFor(file.mimetype, file.originalname)}`;
   if (r2Enabled()) {
-    const { S3Client, PutObjectCommand } = await import("@aws-sdk/client-s3");
-    const client = new S3Client({
-      region: "auto",
-      endpoint: `https://${config.r2.accountId}.r2.cloudflarestorage.com`,
-      credentials: { accessKeyId: config.r2.accessKeyId, secretAccessKey: config.r2.secretAccessKey },
-    });
-    await client.send(
+    const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+    await (await r2Client()).send(
       new PutObjectCommand({ Bucket: config.r2.bucket, Key: key, Body: file.buffer, ContentType: file.mimetype }),
     );
-    return `${config.r2.publicUrl}/${key}`;
+    return `/api/files/${key}`;
   }
   const local = `${tenantId}/${nanoid(16)}.${extFor(file.mimetype, file.originalname)}`;
   const full = path.join(uploadsDir, local);
