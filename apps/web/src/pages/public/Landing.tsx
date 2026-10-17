@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, Boxes, Camera, CheckSquare, FileDown, MessageCircle, Mic, PieChart, Shield, Wallet } from "lucide-react";
 import { Button } from "@/components/ui";
+import { ParticleField } from "@/components/fx/ParticleField";
 
 const FEATURES = [
   { icon: FileDown, title: "Factura y descarga el PDF", text: "Cuenta de cobro con el formato que tus clientes ya conocen: texto, PDF y link público." },
@@ -25,6 +26,7 @@ export function Landing() {
     <>
       <section className="relative overflow-hidden bg-ink text-white">
         <div className="absolute inset-0 opacity-[0.07]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, #fff 1px, transparent 0)", backgroundSize: "22px 22px" }} />
+        <ParticleField />
         <div className="relative mx-auto max-w-6xl px-4 py-16 sm:py-24 grid lg:grid-cols-[1.1fr_0.9fr] gap-10 items-center">
           <div>
             <p className="text-amber font-semibold text-sm mb-3">Para talleres de motos y carros en Colombia</p>

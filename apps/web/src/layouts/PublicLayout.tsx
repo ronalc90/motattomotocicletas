@@ -1,11 +1,16 @@
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
 import { Logo } from "@/components/layout/Logo";
 import { SiteHeader, siteLinks as links } from "@/components/layout/SiteHeader";
 import { SUPPORT_EMAIL, SUPPORT_WHATSAPP } from "@/lib/utils";
+import { CursorGlow } from "@/components/fx/CursorGlow";
+import { useReveal } from "@/components/fx/useReveal";
 
 export function PublicLayout() {
+  const { pathname } = useLocation();
+  useReveal(pathname);
   return (
     <div className="min-h-dvh flex flex-col bg-white text-ink dark:bg-ink dark:text-slate-100">
+      <CursorGlow />
       <SiteHeader />
       <main className="flex-1"><Outlet /></main>
       <footer className="border-t border-slate-200 bg-slate-50 dark:bg-ink-2 dark:border-slate-800">

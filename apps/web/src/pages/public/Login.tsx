@@ -9,28 +9,8 @@ import { errorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Button, Input } from "@/components/ui";
 import { AuthLayout } from "@/layouts/AuthLayout";
+import { ParticleField } from "@/components/fx/ParticleField";
 import "./login.css";
-
-/** Floating embers that rise behind the hero. Positions are deterministic so the layout is stable. */
-function Sparks({ count = 22 }: { count?: number }) {
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      {Array.from({ length: count }, (_, i) => (
-        <span
-          key={i}
-          className="lg-spark"
-          style={{
-            ["--x" as string]: `${(i * 37) % 100}%`,
-            ["--s" as string]: `${3 + (i % 4) * 2}px`,
-            ["--d" as string]: `${5 + (i % 5) * 1.6}s`,
-            ["--delay" as string]: `${-((i * 0.9) % 7)}s`,
-            ["--drift" as string]: `${((i % 7) - 3) * 14}`,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
 
 /** Wheel with a rotating rim and spokes; the tire stays still so only the spokes turn. */
 function Wheel({ cx, cy }: { cx: number; cy: number }) {
@@ -120,7 +100,7 @@ function Hero() {
   return (
     <section className="lg-scan relative overflow-hidden bg-gradient-to-br from-ink via-ink-2 to-[#2a1408] px-6 py-10 sm:px-10 lg:py-16 flex flex-col justify-center">
       <div aria-hidden className="lg-grid-bg pointer-events-none absolute inset-0" />
-      <Sparks />
+      <ParticleField />
       {/* Glow behind the bike */}
       <div aria-hidden className="pointer-events-none absolute -top-24 right-[-10%] h-96 w-96 rounded-full bg-motor/25 blur-3xl" />
       <div aria-hidden className="pointer-events-none absolute bottom-0 left-0 h-40 w-full bg-gradient-to-t from-ink to-transparent" />
