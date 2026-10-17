@@ -52,6 +52,8 @@ const TenantSchema = new Schema(
     status: { type: String, enum: TENANT_STATUS, default: "activo" },
     settings: { type: SettingsSchema, default: () => ({}) },
     usage: { type: UsageSchema, default: () => ({}) },
+    /** Llamadas de IA permitidas por mes. Lo cambia el superadmin. */
+    aiCallsLimit: { type: Number, default: 300, min: 0 },
   },
   { timestamps: true },
 );

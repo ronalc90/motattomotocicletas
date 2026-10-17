@@ -3,6 +3,7 @@ import { PRODUCT_CATEGORIES, type AssistantAction, type AssistantProposal, type 
 import { Customer, Order, Product, Service, Vehicle } from "../models/index.js";
 import { normalize } from "../lib/text.js";
 import { aiEnabled, askClaude, extractJson, safeAsk } from "./ai.js";
+import { aiOverLimit } from "../lib/aiUsage.js";
 import { parseSpanishNumber, splitPrice } from "./spanishNumbers.js";
 
 interface Catalog {
@@ -481,9 +482,10 @@ export async function interpret(
     (local.intent === "consultar_precio" || local.intent === "consultar_stock") && local.items.some((i) => i.productId || i.serviceId) ||
     local.intent === "consultar_inventario" ||
     (local.intent === "buscar_vehiculo" && !!local.vehicle?.id);
-  if (!aiEnabled() || resolvedLocally) return local;
+  // Sin clave, con la consulta resuelta localmente, o con el límite mensual alcanzado: no se llama al modelo.
+  if (!aiEnabled() || resolvedLocally || (await aiOverLimit(tenantId))) return local;
   const ctxLine = context ? `\nContexto en pantalla: ${JSON.stringify(context)}` : "";
-  const text_ = await safeAsk(() => askClaude(`Texto dictado: """${text}"""${ctxLine}\nResponde solo el JSON.`, systemPrompt(retrieveCandidates(text, cat)), 2000), "");
+  const text_ = await safeAsk(() => askClaude(`Texto dictado: """${text}"""${ctxLine}\nResponde solo el JSON.`, systemPrompt(retrieveCandidates(text, cat)), 2000, String(tenantId)), "");
   const parsed = extractJson(text_);
   const grounded = groundAnswer(sanitize(parsed, cat, local), cat);
   // Si el modelo no ubicó el producto/servicio en el catálogo pero el buscador local sí, usar el local.

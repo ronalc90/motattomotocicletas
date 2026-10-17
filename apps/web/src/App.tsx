@@ -32,6 +32,7 @@ const Settings = lazy(() => import("@/pages/app/Settings").then((m) => ({ defaul
 const SaStats = lazy(() => import("@/pages/superadmin/Superadmin").then((m) => ({ default: m.SaStats })));
 const SaTenants = lazy(() => import("@/pages/superadmin/Superadmin").then((m) => ({ default: m.SaTenants })));
 const SaTenantDetail = lazy(() => import("@/pages/superadmin/Superadmin").then((m) => ({ default: m.SaTenantDetail })));
+const SaAi = lazy(() => import("@/pages/superadmin/Superadmin").then((m) => ({ default: m.SaAi })));
 
 export function App() {
   return (
@@ -74,6 +75,7 @@ export function App() {
             <Route index element={<SaStats />} />
             <Route path="talleres" element={<SaTenants />} />
             <Route path="talleres/:id" element={<SaTenantDetail />} />
+            <Route path="ia" element={<SaAi />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />

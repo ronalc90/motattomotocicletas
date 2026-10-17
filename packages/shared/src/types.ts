@@ -54,6 +54,8 @@ export interface Tenant extends BaseDoc {
   status: TenantStatus;
   settings: TenantSettings;
   usage: { ordersThisMonth: number; usersCount: number; productsCount: number };
+  /** Llamadas de IA por mes permitidas para este taller. */
+  aiCallsLimit: number;
 }
 
 export interface User extends BaseDoc {

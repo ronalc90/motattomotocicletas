@@ -1,5 +1,6 @@
 import { config } from "../config.js";
 import { logger } from "../lib/logger.js";
+import { recordAi } from "../lib/aiUsage.js";
 
 /** OpenAI models. Vision + text on one model; Whisper for speech. */
 export const AI_MODEL = "gpt-4o-mini";
@@ -36,6 +37,7 @@ export async function askWithImage(
   prompt: string,
   image: { buffer: Buffer; mimetype: string },
   system?: string,
+  tenantId?: string,
 ): Promise<string> {
   const openai = await client();
   const mediaType = IMAGE_TYPES.includes(image.mimetype) ? image.mimetype : "image/jpeg";
@@ -55,10 +57,11 @@ export async function askWithImage(
       },
     ],
   });
+  if (tenantId) await recordAi(tenantId, { promptTokens: res.usage?.prompt_tokens, completionTokens: res.usage?.completion_tokens });
   return res.choices[0]?.message?.content ?? "";
 }
 
-export async function ask(prompt: string, system?: string, maxTokens = 1500): Promise<string> {
+export async function ask(prompt: string, system?: string, maxTokens = 1500, tenantId?: string): Promise<string> {
   const openai = await client();
   const res = await openai.chat.completions.create({
     model: AI_MODEL,
@@ -67,11 +70,12 @@ export async function ask(prompt: string, system?: string, maxTokens = 1500): Pr
     response_format: { type: "json_object" },
     messages: [...(system ? [{ role: "system" as const, content: system }] : []), { role: "user", content: prompt }],
   });
+  if (tenantId) await recordAi(tenantId, { promptTokens: res.usage?.prompt_tokens, completionTokens: res.usage?.completion_tokens });
   return res.choices[0]?.message?.content ?? "";
 }
 
 /** Speech-to-text with Whisper (Spanish). */
-export async function transcribeAudio(audio: { buffer: Buffer; mimetype: string; originalname?: string }): Promise<string> {
+export async function transcribeAudio(audio: { buffer: Buffer; mimetype: string; originalname?: string; tenantId?: string }): Promise<string> {
   const openai = await client();
   const { toFile } = await import("openai");
   const ext = audio.mimetype.includes("webm") ? "webm" : audio.mimetype.includes("mp4") || audio.mimetype.includes("m4a") ? "m4a" : audio.mimetype.includes("wav") ? "wav" : audio.mimetype.includes("ogg") ? "ogg" : "mp3";
@@ -82,6 +86,7 @@ export async function transcribeAudio(audio: { buffer: Buffer; mimetype: string;
     language: "es",
     prompt: "Taller de motos y carros en Colombia. Repuestos, servicios, precios en pesos.",
   });
+  if (audio.tenantId) await recordAi(audio.tenantId, { transcription: true, audioSeconds: Math.round(audio.buffer.length / 16000) });
   return res.text;
 }
 

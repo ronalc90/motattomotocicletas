@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Building2, LogOut, PieChart } from "lucide-react";
+import { Building2, LogOut, PieChart, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Logo } from "@/components/layout/Logo";
 import { cn } from "@/lib/utils";
@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { to: "/superadmin", label: "Estadísticas", icon: PieChart, end: true },
   { to: "/superadmin/talleres", label: "Talleres", icon: Building2 },
+  { to: "/superadmin/ia", label: "Uso IA", icon: Sparkles },
 ];
 
 export function SuperadminShell() {

@@ -5,6 +5,7 @@ import { parseBody } from "../middleware/validate.js";
 import { interpret } from "../services/assistant.js";
 import { aiEnabled, transcribeAudio } from "../services/ai.js";
 import { AppError } from "../lib/errors.js";
+import { assertAiQuota } from "../lib/aiUsage.js";
 import { audioUpload } from "../services/storage.js";
 
 export const assistantRouter = Router();
@@ -30,7 +31,8 @@ assistantRouter.post(
     }
     const file = req.file;
     if (!file) throw new AppError(400, "VALIDATION", "Falta el archivo de audio");
-    const text = await transcribeAudio({ buffer: file.buffer, mimetype: file.mimetype, originalname: file.originalname });
+    await assertAiQuota(req.tenantId!);
+    const text = await transcribeAudio({ buffer: file.buffer, mimetype: file.mimetype, originalname: file.originalname, tenantId: String(req.tenantId) });
     res.json({ text });
   }),
 );

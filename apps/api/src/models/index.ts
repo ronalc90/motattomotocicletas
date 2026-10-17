@@ -11,3 +11,4 @@ export * from "./Expense.js";
 export * from "./CashClosing.js";
 export * from "./AuditLog.js";
 export * from "./Counter.js";
+export * from "./AiUsage.js";

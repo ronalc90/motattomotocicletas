@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Building2, ChevronLeft, LifeBuoy } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { ROLE_LABEL, type Paginated, type Tenant, type User } from "@motatto/shared";
 import { api, errorMessage, tokenStore } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -93,7 +94,11 @@ export function SaTenantDetail() {
           <div className="space-y-3">
             <Select label="Plan" options={[{ value: "gratis", label: "Gratis" }, { value: "pro", label: "Pro" }]} value={t.plan} onChange={(e) => upd.mutate({ plan: e.target.value })} />
             <Select label="Estado" options={[{ value: "activo", label: "Activo" }, { value: "suspendido", label: "Suspendido" }]} value={t.status} onChange={(e) => upd.mutate({ status: e.target.value })} />
-            <p className="text-xs muted">Suspendido: los usuarios solo pueden entrar y ver, no operar.</p>
+            <div>
+              <p className="text-sm font-medium mb-1">Límite mensual de IA (llamadas)</p>
+              <AiLimitEditor tenantId={t.id} limit={t.aiCallsLimit} />
+            </div>
+            <p className="text-xs muted">Suspendido: los usuarios solo pueden entrar y ver, no operar. Al llegar al límite de IA, el asistente sigue funcionando sin IA.</p>
           </div>
         </Card>
         <Card>
@@ -112,6 +117,87 @@ export function SaTenantDetail() {
         <ul className="divide-y line -mx-4 sm:-mx-5 text-sm">{t.users.map((u) => <li key={u.id} className="px-4 sm:px-5 py-2 flex items-center gap-3"><span className="flex-1 min-w-0"><span className="font-medium">{u.name}</span><span className="block text-xs muted">{u.email}</span></span><Badge>{ROLE_LABEL[u.role]}</Badge>{!u.active && <Badge tone="amber">inactivo</Badge>}<span className="text-xs muted">{u.lastLoginAt ? fmtDate(u.lastLoginAt) : "nunca"}</span></li>)}</ul>
       </Card>
       <ConfirmDialog open={impOpen} onClose={() => setImpOpen(false)} onConfirm={() => imp.mutate()} loading={imp.isPending} title={`¿Entrar a ${t.name} como soporte?`} message="Verás el taller como su dueño durante 4 horas. La acción queda registrada en la auditoría del taller." confirmText="Entrar" />
+    </div>
+  );
+}
+
+interface AiUsageRow { tenantId: string; name: string; slug: string; plan: Tenant["plan"]; status: Tenant["status"]; limit: number; calls: number; pct: number; promptTokens: number; completionTokens: number; transcriptions: number; costUsd: number }
+interface AiUsageResp { month: string; totals: { calls: number; promptTokens: number; completionTokens: number; transcriptions: number; costUsd: number; tenantsOverLimit: number; tenantsActive: number }; items: AiUsageRow[] }
+
+/** Edita el límite mensual de llamadas de IA de un taller. Solo el superadmin lo ve. */
+export function AiLimitEditor({ tenantId, limit }: { tenantId: string; limit: number }) {
+  const qc = useQueryClient();
+  const [v, setV] = useState(String(limit));
+  useEffect(() => setV(String(limit)), [limit]);
+  const n = Number(v);
+  const valid = v !== "" && Number.isInteger(n) && n >= 0 && n <= 1000000;
+  const save = useMutation({
+    mutationFn: () => api.patch(`/superadmin/tenants/${tenantId}`, { aiCallsLimit: n }),
+    onSuccess: () => {
+      toast.success("Límite de IA guardado");
+      qc.invalidateQueries({ queryKey: ["sa-ai-usage"] });
+      qc.invalidateQueries({ queryKey: ["sa-tenant", tenantId] });
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  return (
+    <div className="flex items-center gap-2">
+      <input type="number" min={0} className="field h-9 w-28 py-1 tabular-nums" value={v} onChange={(e) => setV(e.target.value)} aria-label="Límite mensual de IA" />
+      <Button size="sm" onClick={() => save.mutate()} disabled={!valid || save.isPending || n === limit}>{save.isPending ? "Guardando…" : "Guardar"}</Button>
+    </div>
+  );
+}
+
+function currentMonthInput(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** Métricas de uso de IA de todos los talleres, con límite editable. */
+export function SaAi() {
+  const [month, setMonth] = useState(currentMonthInput());
+  const q = useQuery({ queryKey: ["sa-ai-usage", month], queryFn: () => api.get<AiUsageResp>("/superadmin/ai-usage", { month }) });
+  if (q.isLoading || !q.data) return <PageLoader />;
+  const { totals, items } = q.data;
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        title="Uso de IA"
+        sub="Llamadas, tokens y costo estimado por taller. Cambia el límite de cada taller en la última columna."
+        action={<input type="month" className="field h-10 w-auto" value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Mes" />}
+      />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Stat label="Llamadas del mes" value={totals.calls} tone="motor" />
+        <Stat label="Costo estimado" value={`US$ ${totals.costUsd.toFixed(2)}`} sub={`${totals.transcriptions} transcripciones de voz`} />
+        <Stat label="Talleres que usan IA" value={totals.tenantsActive} />
+        <Stat label="Talleres en su límite" value={totals.tenantsOverLimit} sub="ya no usan IA este mes" />
+      </div>
+      <DataTable
+        rows={items}
+        rowKey={(t) => t.tenantId}
+        empty={<EmptyState icon={<Building2 />} title="Sin talleres" />}
+        columns={[
+          { key: "name", header: "Taller", cell: (t) => <span><span className="font-medium">{t.name}</span><span className="block text-xs muted">{t.slug}</span></span> },
+          { key: "plan", header: "Plan", cell: (t) => <PlanBadge plan={t.plan} />, hideMobile: true },
+          {
+            key: "usage",
+            header: "Uso del mes",
+            cell: (t) => (
+              <div className="min-w-[150px]">
+                <div className="text-xs tabular-nums">{t.calls} / {t.limit} · {t.pct}%</div>
+                <div className="h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 mt-1 overflow-hidden">
+                  <div className={cn("h-full", t.pct >= 100 ? "bg-bad" : t.pct >= 80 ? "bg-amber" : "bg-motor")} style={{ width: `${Math.min(100, t.pct)}%` }} />
+                </div>
+              </div>
+            ),
+          },
+          { key: "tokens", header: "Tokens", cell: (t) => (t.promptTokens + t.completionTokens).toLocaleString("es-CO"), hideMobile: true },
+          { key: "cost", header: "Costo US$", cell: (t) => t.costUsd.toFixed(3), hideMobile: true },
+          { key: "voice", header: "Voz", cell: (t) => t.transcriptions, hideMobile: true },
+          { key: "limit", header: "Límite / mes", cell: (t) => <AiLimitEditor tenantId={t.tenantId} limit={t.limit} /> },
+        ]}
+      />
+      <p className="text-xs muted">Costo estimado con precios públicos de gpt-4o-mini y whisper-1; la factura real de OpenAI manda.</p>
     </div>
   );
 }

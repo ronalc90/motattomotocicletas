@@ -1,5 +1,6 @@
 import { PRODUCT_CATEGORIES, type LabelReadResult, type ProductCategory } from "@motatto/shared";
 import { aiEnabled, askClaudeWithImage, extractJson, safeAsk } from "./ai.js";
+import { aiOverLimit } from "../lib/aiUsage.js";
 import { Product } from "../models/index.js";
 import type { Types } from "mongoose";
 
@@ -46,7 +47,8 @@ export async function readLabel(
   file: { buffer: Buffer; mimetype: string },
 ): Promise<LabelReadResult & { note?: string }> {
   if (!aiEnabled()) return { ...EMPTY, note: "IA no configurada" };
-  const text = await safeAsk(() => askClaudeWithImage(PROMPT, file), "");
+  if (await aiOverLimit(tenantId)) return { ...EMPTY, note: "Límite mensual de IA alcanzado" };
+  const text = await safeAsk(() => askClaudeWithImage(PROMPT, file, undefined, String(tenantId)), "");
   const raw = extractJson<Raw>(text);
   if (!raw) return { ...EMPTY, rawText: text.slice(0, 2000) };
 

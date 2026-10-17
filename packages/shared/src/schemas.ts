@@ -76,6 +76,7 @@ export type UpdateTenantInput = z.infer<typeof UpdateTenantSchema>;
 export const SuperadminUpdateTenantSchema = z.object({
   plan: z.enum(PLANS).optional(),
   status: z.enum(TENANT_STATUS).optional(),
+  aiCallsLimit: z.coerce.number().int().min(0).max(1000000).optional(),
 });
 
 // ---------- Users ----------
