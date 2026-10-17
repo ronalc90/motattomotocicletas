@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { CloseDaySchema, ExpenseSchema } from "@motatto/shared";
 import { requirePermission, requireTenant, scope, uid, wrap } from "../middleware/auth.js";
+import { isRealDay } from "@motatto/shared";
 import { parseBody, parseQuery } from "../middleware/validate.js";
 import { CashClosing, Expense, Order, Payment } from "../models/index.js";
 import { rangeOf, toDayString } from "../lib/dates.js";
@@ -123,7 +124,7 @@ cashRouter.post(
   requirePermission("cash:reopen"),
   wrap(async (req, res) => {
     const date = String(req.body?.date ?? "");
-    if (!DAY.test(date)) throw badRequest("Fecha inválida (YYYY-MM-DD)");
+    if (!isRealDay(date)) throw badRequest("Fecha inválida (YYYY-MM-DD)");
     const closing = await CashClosing.findOne({ ...scope(req), date });
     if (!closing) throw notFound("Cierre");
     if (closing.reopened) throw conflict("El día ya está reabierto", "ALREADY_OPEN");

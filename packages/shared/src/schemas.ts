@@ -233,8 +233,16 @@ export const ExpenseSchema = z.object({
 });
 export type ExpenseInput = z.infer<typeof ExpenseSchema>;
 
+/** YYYY-MM-DD that is also a real calendar day (rejects 2026-13-45 or 2026-02-30). */
+export const isRealDay = (d: string): boolean => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+  const [y, m, day] = d.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, day));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === day;
+};
+
 export const CloseDaySchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  date: z.string().refine(isRealDay, "Fecha inválida (YYYY-MM-DD)").optional(),
 });
 
 // ---------- Assistant ----------

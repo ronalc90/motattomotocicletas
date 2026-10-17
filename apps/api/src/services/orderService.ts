@@ -213,6 +213,20 @@ export async function deductPreview(req: Request, order: OrderDoc) {
 export async function applyDeduct(req: Request, order: OrderDoc, deduct: Deduct | undefined): Promise<void> {
   if (!deduct?.length) return;
   const done = new Set(order.stockDeducted.map((d) => String(d.productId)));
+  // Validate every pending line before touching stock, so a bad line never leaves a partial deduction.
+  const needed = new Map<string, number>();
+  for (const d of deduct) if (!done.has(d.productId)) needed.set(d.productId, (needed.get(d.productId) ?? 0) + d.qty);
+  if (needed.size) {
+    const stocks = await Product.find({ ...scope(req), _id: { $in: [...needed.keys()] } }).select("name stock");
+    const byId = new Map(stocks.map((p) => [String(p._id), p]));
+    for (const [id, qty] of needed) {
+      const p = byId.get(id);
+      if (!p) throw notFound("Producto");
+      if (p.stock < qty) {
+        throw conflict(`Stock insuficiente de "${p.name}": hay ${p.stock} y se piden ${qty}`, "INSUFFICIENT_STOCK");
+      }
+    }
+  }
   for (const d of deduct) {
     if (done.has(d.productId)) continue;
     const product = await Product.findOneAndUpdate(
@@ -299,10 +313,15 @@ export async function payOrder(req: Request, order: OrderDoc, input: PaymentInpu
     throw conflict(`No se puede cobrar una orden en estado ${order.status}`, "BAD_TRANSITION");
   }
   const before = order.toJSON();
-  await applyDeduct(req, order, input.deduct);
   order.surchargeMethod = input.method;
   recomputeTotals(order, tenant);
   const amount = input.amount ?? order.total;
+  // Overpaying is allowed (cash change); underpaying would mark the order paid with money missing.
+  // Checked before any stock is deducted so a rejected payment leaves nothing half-applied.
+  if (amount < order.total) {
+    throw badRequest(`El monto cobrado ($${amount}) es menor al total de la orden ($${order.total})`, "AMOUNT_BELOW_TOTAL");
+  }
+  await applyDeduct(req, order, input.deduct);
   const payment = await Payment.create({
     ...scope(req),
     orderId: order._id,
