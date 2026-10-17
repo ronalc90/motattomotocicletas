@@ -1,12 +1,16 @@
 import { Router } from "express";
-import { SuperadminUpdateTenantSchema } from "@motatto/shared";
+import { z } from "zod";
+import mongoose from "mongoose";
+import { SuperadminUpdateTenantSchema, UpdateUserSchema } from "@motatto/shared";
 import { auth, requireRole, wrap } from "../middleware/auth.js";
 import { parseBody } from "../middleware/validate.js";
 import { AiUsage, Order, Product, Tenant, User } from "../models/index.js";
 import { currentMonth } from "../lib/aiUsage.js";
 import { monthStart } from "../lib/dates.js";
 import { searchRegex } from "../lib/text.js";
-import { AppError, notFound } from "../lib/errors.js";
+import { AppError, badRequest, notFound } from "../lib/errors.js";
+import { logger } from "../lib/logger.js";
+import { publicUser } from "../services/tenantService.js";
 import { audit } from "../lib/audit.js";
 import { signToken } from "../lib/jwt.js";
 import { config } from "../config.js";
@@ -177,5 +181,104 @@ superadminRouter.post(
     req.tenantId = t._id;
     await audit(req, "superadmin.impersonate", "tenant", t._id, undefined, { slug: t.slug });
     res.json({ token, tenant: t.toJSON() });
+  }),
+);
+
+// ---------- Usuarios de todos los talleres (dueños y personal) ----------
+
+const STAFF_ROLES = ["admin", "mecanico", "cajero", "contador"] as const;
+
+superadminRouter.get(
+  "/users",
+  wrap(async (req, res) => {
+    const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    const kind = req.query.kind === "owner" || req.query.kind === "staff" ? req.query.kind : "all";
+    const filter: Record<string, unknown> = { role: { $ne: "superadmin" } };
+    if (kind === "owner") filter.role = "dueno";
+    if (kind === "staff") filter.role = { $in: STAFF_ROLES };
+    if (q) {
+      const rx = searchRegex(q);
+      filter.$or = [{ name: rx }, { email: rx }];
+    }
+    const users = await User.find(filter).sort({ createdAt: -1 }).limit(500);
+    const tenants = await Tenant.find({ _id: { $in: [...new Set(users.map((u) => String(u.tenantId)))] } }).select("name slug status");
+    const byId = new Map(tenants.map((t) => [String(t._id), t]));
+    const items = users.map((u) => {
+      const t = byId.get(String(u.tenantId));
+      return { ...publicUser(u), tenant: t ? { id: String(t._id), name: t.name, slug: t.slug, status: t.status } : null };
+    });
+    res.json({ items, total: items.length, page: 1, limit: items.length });
+  }),
+);
+
+superadminRouter.patch(
+  "/users/:id",
+  wrap(async (req, res) => {
+    const input = parseBody(UpdateUserSchema, req);
+    const user = await User.findById(req.params.id);
+    if (!user || user.role === "superadmin") throw notFound("Usuario");
+    const before = publicUser(user);
+    if (input.name !== undefined) user.name = input.name;
+    if (input.role !== undefined) user.role = input.role;
+    if (input.active !== undefined) user.active = input.active;
+    await user.save();
+    req.tenantId = user.tenantId ?? undefined;
+    await audit(req, "superadmin.user_update", "user", user._id, before, publicUser(user));
+    res.json(publicUser(user));
+  }),
+);
+
+// ---------- Métricas de la plataforma (últimos 6 meses, zona Bogotá) ----------
+
+superadminRouter.get(
+  "/metrics",
+  wrap(async (_req, res) => {
+    const months = monthsBack(6);
+    const first = new Date(`${months[0]}-01T00:00:00-05:00`);
+    const monthOf = { $dateToString: { format: "%Y-%m", date: "$createdAt", timezone: "America/Bogota" } };
+    const [tenantsByMonth, ordersByMonth, usersByRole, ordersByStatus, plans] = await Promise.all([
+      Tenant.aggregate([{ $match: { createdAt: { $gte: first } } }, { $group: { _id: monthOf, n: { $sum: 1 } } }]),
+      Order.aggregate([
+        { $match: { createdAt: { $gte: first } } },
+        { $group: { _id: monthOf, n: { $sum: 1 }, revenue: { $sum: { $cond: [{ $eq: ["$status", "pagada"] }, "$total", 0] } } } },
+      ]),
+      User.aggregate([{ $match: { role: { $ne: "superadmin" }, active: true } }, { $group: { _id: "$role", n: { $sum: 1 } } }]),
+      Order.aggregate([{ $group: { _id: "$status", n: { $sum: 1 } } }]),
+      Tenant.aggregate([{ $group: { _id: "$plan", n: { $sum: 1 } } }]),
+    ]);
+    const series = months.map((m) => {
+      const t = tenantsByMonth.find((x) => x._id === m);
+      const o = ordersByMonth.find((x) => x._id === m);
+      return { month: m, tenants: t?.n ?? 0, orders: o?.n ?? 0, revenue: o?.revenue ?? 0 };
+    });
+    res.json({
+      series,
+      usersByRole: usersByRole.map((x) => ({ role: x._id, count: x.n })),
+      ordersByStatus: ordersByStatus.map((x) => ({ status: x._id, count: x.n })),
+      plans: plans.map((x) => ({ plan: x._id, count: x.n })),
+    });
+  }),
+);
+
+// ---------- Eliminar un taller y todos sus datos (irreversible) ----------
+
+const PurgeTenantSchema = z.object({ confirm: z.string().trim() });
+
+superadminRouter.delete(
+  "/tenants/:id",
+  wrap(async (req, res) => {
+    const { confirm } = parseBody(PurgeTenantSchema, req);
+    const t = await Tenant.findById(req.params.id);
+    if (!t) throw notFound("Taller");
+    if (confirm !== t.slug) throw badRequest("Escribe el slug exacto del taller para confirmar", "CONFIRM_MISMATCH");
+    const counts: Record<string, number> = {};
+    for (const [name, col] of Object.entries(mongoose.connection.collections)) {
+      if (name === "tenants") continue;
+      const r = await col.deleteMany({ tenantId: t._id });
+      counts[name] = r.deletedCount ?? 0;
+    }
+    await Tenant.deleteOne({ _id: t._id });
+    logger.warn({ tenantId: String(t._id), slug: t.slug, counts, by: String(req.user!._id) }, "superadmin.tenant_purged");
+    res.json({ deleted: true, slug: t.slug, counts });
   }),
 );
