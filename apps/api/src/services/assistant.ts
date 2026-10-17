@@ -252,13 +252,20 @@ function systemPrompt(cat: Catalog): string {
   "customer": { "id": "id del catálogo si coincide", "name": "...", "phone": "..." } | null,
   "vehicle": { "id": "id si coincide", "brand": "...", "model": "...", "plate": "..." } | null,
   "items": [ { "type": "repuesto"|"servicio"|"otro", "productId": "id o null", "serviceId": "id o null", "description": "...", "qty": 1, "unitPrice": 32000, "confidence": 0.9, "matchedName": "nombre del catálogo" } ],
-  "unrecognized": ["fragmentos que no pudiste interpretar"]
+  "unrecognized": ["fragmentos que no pudiste interpretar"],
+  "discount": 0,
+  "km": null,
+  "description": "problema o trabajo solicitado si lo dictan, si no null"
 }
 Reglas:
-- Usa los precios del catálogo salvo que el usuario diga un precio ("a treinta y dos mil" = 32000, "26 mil" = 26000, "veintiséis mil" = 26000).
-- Repuestos → type "repuesto" con productId. Servicios/mano de obra → "servicio" con serviceId. Lo que no esté en el catálogo → "otro" (o "servicio" si es mano de obra) sin id, unitPrice 0 si no se dijo precio, y agrégalo a unrecognized.
-- "cuánto vale / cuánto cuesta" → consultar_precio. "hay / cuántos quedan / stock" → consultar_stock. "placa XXX" sin trabajos → buscar_vehiculo.
-- Montos enteros en pesos. No inventes ids.
+- Usa los precios del catálogo salvo que el usuario diga un precio ("a treinta y dos mil" = 32000, "26 mil" = 26000, "veintiséis mil" = 26000, "80 lucas" = 80000).
+- Repuestos → type "repuesto" con productId. Servicios/mano de obra → "servicio" con serviceId. Lo que no esté en el catálogo → "otro" sin id (aunque sea mano de obra), unitPrice 0 si no se dijo precio, y agrégalo a unrecognized para que el usuario lo complete.
+- Un repuesto y su mano de obra son DOS líneas distintas: "cambio de batería, batería a 280 mil" = línea servicio "Cambio de batería" + línea repuesto/otro "Batería" 280000. "Cambio de aceite y filtro" es UN servicio del catálogo; si además dice "aceite" o "filtro" como repuesto, esos son líneas de repuesto aparte.
+- "las dos pastillas" / "pastillas delanteras y traseras" = dos líneas (delanteras y traseras). "dos bujías" = qty 2 de una línea.
+- "descuento de X" / "rebájale X" → campo discount en pesos (no es una línea). "tiene N mil kilómetros" → km.
+- "cuánto vale / cuánto cuesta" → consultar_precio. "hay / cuántos quedan / stock" → consultar_stock (si pregunta precio Y stock, usa consultar_precio y menciona ambos en answer). "placa XXX" sin trabajos → buscar_vehiculo.
+- answer: para crear_orden describe la PROPUESTA ("Propongo N líneas por $X, con descuento de $Y"), nunca digas que ya se creó. Para consultas, responde con el dato exacto del catálogo (precio y stock).
+- Montos enteros en pesos. No inventes ids ni precios de cosas fuera del catálogo.
 
 PRODUCTOS:
 ${products || "(ninguno)"}
@@ -289,7 +296,14 @@ function sanitize(raw: unknown, cat: Catalog, fallback: AssistantProposal): Assi
     const serviceId = typeof o.serviceId === "string" && sids.has(o.serviceId) ? o.serviceId : undefined;
     const typeRaw = String(o.type ?? "");
     const type: ItemType = productId ? "repuesto" : serviceId ? "servicio" : typeRaw === "servicio" ? "servicio" : typeRaw === "repuesto" ? "repuesto" : "otro";
-    const description = typeof o.description === "string" && o.description.trim() ? o.description.trim() : productId ? cat.products.find((p) => p.id === productId)!.name : serviceId ? cat.services.find((s) => s.id === serviceId)!.name : "";
+    // Matched catalog entries always use the catalog name (what the invoice should show).
+    const description = productId
+      ? cat.products.find((p) => p.id === productId)!.name
+      : serviceId
+        ? cat.services.find((s) => s.id === serviceId)!.name
+        : typeof o.description === "string" && o.description.trim()
+          ? o.description.trim()
+          : "";
     if (!description) continue;
     const qty = Math.max(1, Math.min(100, Math.round(Number(o.qty) || 1)));
     let unitPrice = Math.max(0, Math.round(Number(o.unitPrice) || 0));
@@ -309,7 +323,37 @@ function sanitize(raw: unknown, cat: Catalog, fallback: AssistantProposal): Assi
     vehicle: v ? { id: vehId, brand: typeof v.brand === "string" ? v.brand : undefined, model: typeof v.model === "string" ? v.model : undefined, plate: typeof v.plate === "string" ? v.plate : undefined } : fallback.vehicle,
     items,
     unrecognized: Array.isArray(r.unrecognized) ? r.unrecognized.filter((x): x is string => typeof x === "string") : [],
+    discount: Math.max(0, Math.round(Number(r.discount) || 0)) || undefined,
+    km: Number(r.km) > 0 ? Math.round(Number(r.km)) : undefined,
+    description: typeof r.description === "string" && r.description.trim() ? r.description.trim() : undefined,
   };
+}
+
+/** For price/stock questions, rebuild the answer from the catalog so numbers are never hallucinated. */
+function groundAnswer(p: AssistantProposal, cat: Catalog): AssistantProposal {
+  const fmt = (n: number) => `$${n.toLocaleString("es-CO")}`;
+  if (p.intent === "crear_orden") {
+    if (!p.items.length) return p;
+    const subtotal = p.items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+    const pending = p.items.filter((i) => !i.unitPrice).length;
+    const who = [p.customer?.name, p.vehicle && [p.vehicle.brand, p.vehicle.model].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+    const parts = [
+      `Propongo ${p.items.length} línea${p.items.length === 1 ? "" : "s"}${who ? ` para ${who}` : ""}: subtotal ${fmt(subtotal)}`,
+      p.discount ? `descuento ${fmt(p.discount)}` : "",
+      p.discount ? `total ${fmt(Math.max(0, subtotal - p.discount))}` : "",
+      pending ? `${pending} sin precio, complétalo` : "",
+    ].filter(Boolean);
+    return { ...p, answer: parts.join(", ") + "." };
+  }
+  if (p.intent !== "consultar_precio" && p.intent !== "consultar_stock") return p;
+  const prods = p.items.filter((i) => i.productId).map((i) => cat.products.find((x) => x.id === i.productId)!);
+  const servs = p.items.filter((i) => i.serviceId).map((i) => cat.services.find((x) => x.id === i.serviceId)!);
+  if (!prods.length && !servs.length) return p;
+  const parts = [
+    ...prods.map((x) => `${x.name}: ${fmt(x.price)}, ${x.stock > 0 ? `hay ${x.stock} en stock` : "sin stock"}`),
+    ...servs.map((x) => `${x.name}: ${fmt(x.suggestedPrice)} (mano de obra)`),
+  ];
+  return { ...p, answer: parts.join(". ") + "." };
 }
 
 export async function interpret(
@@ -331,7 +375,7 @@ export async function interpret(
   const ctxLine = context ? `\nContexto en pantalla: ${JSON.stringify(context)}` : "";
   const text_ = await safeAsk(() => askClaude(`Texto dictado: """${text}"""${ctxLine}\nResponde solo el JSON.`, systemPrompt(cat), 2000), "");
   const parsed = extractJson(text_);
-  const result = sanitize(parsed, cat, local);
+  const result = groundAnswer(sanitize(parsed, cat, local), cat);
   if (context?.customerId && !result.customer?.id) result.customer = local.customer;
   if (context?.vehicleId && !result.vehicle?.id) result.vehicle = local.vehicle;
   return result;

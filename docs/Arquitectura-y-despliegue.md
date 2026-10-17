@@ -96,4 +96,4 @@ GitHub Actions en cada PR: lint, typecheck, tests de API (incluye tests de aisla
 - ✅ MongoDB en Railway, base sembrada con el tenant `motatto`.
 - ✅ DNS en Namecheap: A @ → Vercel, CNAME www → Vercel, CNAME api → Railway, TXT `_railway-verify.api`.
 - Cuentas iniciales: dueño de Motatto `dirox7@gmail.com`; superadmin de la plataforma `admin@motattomotocicletas.com` (contraseñas en las variables de Railway; cámbialas desde "Mi cuenta").
-- Pendiente opcional: `ANTHROPIC_API_KEY` en Railway para activar OCR de etiquetas y voz con IA (sin ella funciona el matcher local).
+- Pendiente opcional: `OPENAI_API_KEY` en Railway para activar OCR de etiquetas y voz con IA (sin ella funciona el matcher local).

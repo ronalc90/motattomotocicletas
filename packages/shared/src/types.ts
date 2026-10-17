@@ -288,6 +288,12 @@ export interface AssistantProposal {
     matchedName?: string;
   }>;
   unrecognized: string[];
+  /** Discount in pesos if the user mentioned one ("dale veinte mil de descuento"). */
+  discount?: number;
+  /** Odometer reading if mentioned ("tiene 15 mil kilómetros"). */
+  km?: number;
+  /** Free text about the problem / work requested, if dictated. */
+  description?: string;
 }
 
 /** Result of reading a product label photo. */
@@ -299,6 +305,8 @@ export interface LabelReadResult {
   category?: ProductCategory;
   compatibleWith: string[];
   printedPrice?: number;
+  /** Currency of printedPrice when identifiable (e.g. "INR" on Bajaj labels); the price is NOT the sale price. */
+  printedCurrency?: string;
   manufacturedOn?: string;
   rawText: string;
   existingProductId?: string;

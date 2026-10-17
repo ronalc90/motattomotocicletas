@@ -1,13 +1,15 @@
 import { config } from "../config.js";
 import { logger } from "../lib/logger.js";
 
-export const AI_MODEL = "claude-sonnet-4-5";
+/** OpenAI models. Vision + text on one model; Whisper for speech. */
+export const AI_MODEL = "gpt-4o-mini";
+export const AI_STT_MODEL = "whisper-1";
 
-export const aiEnabled = (): boolean => !!config.anthropicApiKey;
+export const aiEnabled = (): boolean => !!config.openaiApiKey;
 
 async function client() {
-  const { default: Anthropic } = await import("@anthropic-ai/sdk");
-  return new Anthropic({ apiKey: config.anthropicApiKey });
+  const { default: OpenAI } = await import("openai");
+  return new OpenAI({ apiKey: config.openaiApiKey });
 }
 
 /** Extracts the first JSON object from a model response, tolerating code fences and prose. */
@@ -28,50 +30,64 @@ export function extractJson<T = unknown>(text: string): T | null {
   return null;
 }
 
-type ImageMedia = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
-export async function askClaudeWithImage(
+export async function askWithImage(
   prompt: string,
   image: { buffer: Buffer; mimetype: string },
   system?: string,
 ): Promise<string> {
-  const anthropic = await client();
-  const mediaType = (["image/jpeg", "image/png", "image/gif", "image/webp"].includes(image.mimetype)
-    ? image.mimetype
-    : "image/jpeg") as ImageMedia;
-  const res = await anthropic.messages.create({
+  const openai = await client();
+  const mediaType = IMAGE_TYPES.includes(image.mimetype) ? image.mimetype : "image/jpeg";
+  const res = await openai.chat.completions.create({
     model: AI_MODEL,
     max_tokens: 1024,
-    system,
+    temperature: 0,
+    response_format: { type: "json_object" },
     messages: [
+      ...(system ? [{ role: "system" as const, content: system }] : []),
       {
         role: "user",
         content: [
-          { type: "image", source: { type: "base64", media_type: mediaType, data: image.buffer.toString("base64") } },
+          { type: "image_url", image_url: { url: `data:${mediaType};base64,${image.buffer.toString("base64")}`, detail: "high" } },
           { type: "text", text: prompt },
         ],
       },
     ],
   });
-  return res.content
-    .filter((b): b is { type: "text"; text: string } & typeof b => b.type === "text")
-    .map((b) => b.text)
-    .join("\n");
+  return res.choices[0]?.message?.content ?? "";
 }
 
-export async function askClaude(prompt: string, system?: string, maxTokens = 1500): Promise<string> {
-  const anthropic = await client();
-  const res = await anthropic.messages.create({
+export async function ask(prompt: string, system?: string, maxTokens = 1500): Promise<string> {
+  const openai = await client();
+  const res = await openai.chat.completions.create({
     model: AI_MODEL,
     max_tokens: maxTokens,
-    system,
-    messages: [{ role: "user", content: prompt }],
+    temperature: 0,
+    response_format: { type: "json_object" },
+    messages: [...(system ? [{ role: "system" as const, content: system }] : []), { role: "user", content: prompt }],
   });
-  return res.content
-    .filter((b): b is { type: "text"; text: string } & typeof b => b.type === "text")
-    .map((b) => b.text)
-    .join("\n");
+  return res.choices[0]?.message?.content ?? "";
 }
+
+/** Speech-to-text with Whisper (Spanish). */
+export async function transcribeAudio(audio: { buffer: Buffer; mimetype: string; originalname?: string }): Promise<string> {
+  const openai = await client();
+  const { toFile } = await import("openai");
+  const ext = audio.mimetype.includes("webm") ? "webm" : audio.mimetype.includes("mp4") || audio.mimetype.includes("m4a") ? "m4a" : audio.mimetype.includes("wav") ? "wav" : audio.mimetype.includes("ogg") ? "ogg" : "mp3";
+  const file = await toFile(audio.buffer, audio.originalname || `audio.${ext}`, { type: audio.mimetype });
+  const res = await openai.audio.transcriptions.create({
+    model: AI_STT_MODEL,
+    file,
+    language: "es",
+    prompt: "Taller de motos y carros en Colombia. Repuestos, servicios, precios en pesos.",
+  });
+  return res.text;
+}
+
+// Backwards-compatible aliases used by labelReader/assistant.
+export const askClaudeWithImage = askWithImage;
+export const askClaude = ask;
 
 export async function safeAsk<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
   try {

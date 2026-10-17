@@ -20,7 +20,7 @@ interface Line { key: string; type: ItemType; productId?: string; serviceId?: st
 let seq = 0;
 const nk = () => `l${++seq}`;
 
-interface NavState { items?: ProposedItem[]; customer?: { id?: string; name: string }; vehicle?: { id?: string; brand?: string; model?: string; plate?: string }; transcript?: string; customerId?: string; vehicleId?: string; warrantyOfOrderId?: string }
+interface NavState { items?: ProposedItem[]; customer?: { id?: string; name: string }; vehicle?: { id?: string; brand?: string; model?: string; plate?: string }; transcript?: string; discount?: number; km?: number; description?: string; customerId?: string; vehicleId?: string; warrantyOfOrderId?: string }
 
 export function OrderForm() {
   const { id } = useParams();
@@ -34,9 +34,9 @@ export function OrderForm() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [lines, setLines] = useState<Line[]>(() => (state.items ?? []).map((i) => ({ key: nk(), type: i.type, productId: i.productId, serviceId: i.serviceId, description: i.description, qty: i.qty, unitPrice: i.unitPrice })));
-  const [discount, setDiscount] = useState(0);
-  const [km, setKm] = useState<string>("");
-  const [description, setDescription] = useState("");
+  const [discount, setDiscount] = useState(state.discount ?? 0);
+  const [km, setKm] = useState<string>(state.km ? String(state.km) : "");
+  const [description, setDescription] = useState(state.description ?? "");
   const [internalNotes, setInternalNotes] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -219,7 +219,7 @@ export function OrderForm() {
       <Modal open={assistant} onClose={() => setAssistant(false)} title="Dictar líneas" drawer>
         <div className="h-[70dvh] sm:h-[calc(100dvh-5rem)]">
           <AssistantPanel compact context={{ customerId: customer?.id, vehicleId: vehicle?.id }} useLabel="Agregar estas líneas a la orden"
-            onUseItems={(items) => { setLines((a) => [...a, ...items.map((i) => ({ key: nk(), type: i.type, productId: i.productId, serviceId: i.serviceId, description: i.description, qty: i.qty, unitPrice: i.unitPrice }))]); setAssistant(false); toast.success(`${items.length} líneas agregadas`); }} />
+            onUseItems={(items, p) => { setLines((a) => [...a, ...items.map((i) => ({ key: nk(), type: i.type, productId: i.productId, serviceId: i.serviceId, description: i.description, qty: i.qty, unitPrice: i.unitPrice }))]); if (p.discount && can("orders:discount")) setDiscount(p.discount); if (p.km) setKm(String(p.km)); if (p.description && !description) setDescription(p.description); setAssistant(false); toast.success(`${items.length} líneas agregadas`); }} />
         </div>
       </Modal>
 

@@ -12,13 +12,14 @@ const PROMPT = `Eres un asistente de un taller de motos y carros en Colombia. Le
   "name": "nombre corto del producto en español (ej. Bujía central NS 200)",
   "brand": "marca (ej. Bajaj, Suzuki, NGK)",
   "category": "una de: ${PRODUCT_CATEGORIES.join(", ")}",
-  "compatibleWith": ["modelos de vehículo compatibles, ej. NS 200"],
-  "printedPrice": número entero en pesos si hay precio impreso, si no null,
+  "compatibleWith": ["modelos de vehículo compatibles que estén IMPRESOS o que puedas inferir con alta certeza por la marca/referencia (ej. Bajaj → Pulsar NS 200, Boxer; Suzuki → Gixxer). Si dudas, []"],
+  "printedPrice": número entero del precio impreso en la etiqueta (puede estar en otra moneda, ej. MRP ₹ de India; devuelve el número tal cual), si no null,
+  "printedCurrency": "moneda del precio impreso si se distingue (COP, INR, USD...), si no null",
   "manufacturedOn": "fecha de fabricación si aparece (YYYY-MM-DD o texto), si no null",
   "rawText": "todo el texto legible de la etiqueta",
   "confidence": número entre 0 y 1 de qué tan seguro estás
 }
-Si un campo no se ve, usa null (o [] para compatibleWith).`;
+Si un campo no se ve, usa null (o [] para compatibleWith). El "name" debe ser útil para buscar en un inventario colombiano: tipo de repuesto + modelo si se sabe (ej. "Bujía central NS 200", "Pastillas delanteras Gixxer 250").`;
 
 interface Raw {
   reference?: string | null;
@@ -29,6 +30,7 @@ interface Raw {
   compatibleWith?: unknown;
   printedPrice?: unknown;
   manufacturedOn?: string | null;
+  printedCurrency?: string | null;
   rawText?: string | null;
   confidence?: unknown;
 }
@@ -71,6 +73,7 @@ export async function readLabel(
     compatibleWith,
     printedPrice,
     manufacturedOn: str(raw.manufacturedOn),
+    printedCurrency: str(raw.printedCurrency),
     rawText: str(raw.rawText) ?? "",
     confidence,
   };

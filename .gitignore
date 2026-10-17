@@ -6,3 +6,5 @@ dist
 *.log
 .DS_Store
 uploads/
+_mongo.mjs
+_dev.sh

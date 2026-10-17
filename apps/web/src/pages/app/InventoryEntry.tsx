@@ -81,7 +81,7 @@ export function InventoryEntry() {
                   ) : (
                     <div>
                       <div className="font-medium truncate">{s.result.name || <span className="muted">Sin nombre detectado</span>}</div>
-                      <div className="text-xs muted truncate">{[s.result.reference, s.result.brand, s.result.category && PRODUCT_CATEGORY_LABEL[s.result.category], s.result.printedPrice && `impreso ${formatMoney(s.result.printedPrice)}`].filter(Boolean).join(" · ")}</div>
+                      <div className="text-xs muted truncate">{[s.result.reference, s.result.brand, s.result.category && PRODUCT_CATEGORY_LABEL[s.result.category], s.result.printedPrice && `precio impreso ${s.result.printedCurrency && s.result.printedCurrency !== 'COP' ? s.result.printedCurrency + ' ' : ''}${s.result.printedPrice.toLocaleString('es-CO')}`].filter(Boolean).join(" · ")}</div>
                       {s.result.compatibleWith.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{s.result.compatibleWith.map((c) => <Badge key={c} tone="blue">{c}</Badge>)}</div>}
                       <div className="mt-2 flex items-center gap-2"><Button size="sm" onClick={() => { setActive(s); setMode("create"); }}>Crear producto</Button>{s.result.confidence > 0 && <span className="text-xs muted">confianza {Math.round(s.result.confidence * 100)}%</span>}</div>
                     </div>
@@ -96,7 +96,7 @@ export function InventoryEntry() {
 
       {active && mode === "create" && (
         <ProductModal open title="Nuevo producto desde la etiqueta" onClose={() => { setActive(null); setMode(null); }}
-          defaults={{ name: active.result?.name ?? "", reference: active.result?.reference ?? "", barcode: active.result?.barcode ?? "", brand: active.result?.brand ?? "", category: active.result?.category ?? "otro", compatibleWith: active.result?.compatibleWith ?? [], price: active.result?.printedPrice ?? 0, initialStock: 1 }}
+          defaults={{ name: active.result?.name ?? "", reference: active.result?.reference ?? "", barcode: active.result?.barcode ?? "", brand: active.result?.brand ?? "", category: active.result?.category ?? "otro", compatibleWith: active.result?.compatibleWith ?? [], price: 0, cost: 0, initialStock: 1 }}
           onSaved={(p) => { if (active.id === "manual") { setActive(null); setMode(null); nav(`/app/inventario/${p.id}`); } else done(active, p.id); }} />
       )}
       {active && mode === "entry" && active.existing && (

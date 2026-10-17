@@ -5,6 +5,10 @@ import type { Express } from "express";
 
 process.env.NODE_ENV = "test";
 process.env.JWT_SECRET = "test-secret";
+process.env.OPENAI_API_KEY = "";
+process.env.SUPERADMIN_EMAIL = "superadmin@motatto.app";
+process.env.SUPERADMIN_PASSWORD = "Motatto2026!";
+process.env.SEED_OWNER_PASSWORD = "Motatto2026!";
 process.env.WEB_URL = "http://web.test";
 
 let mongod: MongoMemoryServer | null = null;

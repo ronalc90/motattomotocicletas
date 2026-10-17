@@ -15,7 +15,7 @@ export const config = {
     .map((s) => s.trim())
     .filter(Boolean),
   webUrl: (env.WEB_URL ?? "http://localhost:5173").replace(/\/$/, ""),
-  anthropicApiKey: env.ANTHROPIC_API_KEY ?? "",
+  openaiApiKey: env.OPENAI_API_KEY ?? "",
   r2: {
     accountId: env.R2_ACCOUNT_ID ?? "",
     accessKeyId: env.R2_ACCESS_KEY_ID ?? "",
