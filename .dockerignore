@@ -2,6 +2,7 @@ node_modules
 **/node_modules
 **/dist
 .git
-apps/web
+apps/web/*
+!apps/web/package.json
 docs
 *.md
