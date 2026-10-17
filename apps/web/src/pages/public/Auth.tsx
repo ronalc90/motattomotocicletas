@@ -9,21 +9,20 @@ import { RegisterTenantSchema, ROLE_LABEL, type Role, type Tenant } from "@motat
 import { api, errorMessage } from "@/lib/api";
 import { useAuth, type AuthUser } from "@/lib/auth";
 import { Button, Input, PageLoader } from "@/components/ui";
-import { Logo } from "@/components/layout/Logo";
+import { AuthLayout } from "@/layouts/AuthLayout";
 import { cn } from "@/lib/utils";
 
 function AuthFrame({ title, sub, children, wide }: { title: string; sub?: string; children: React.ReactNode; wide?: boolean }) {
   return (
-    <div className="min-h-dvh bg-ink text-slate-100 flex flex-col">
-      <div className="p-4"><Link to="/"><Logo light /></Link></div>
-      <div className="flex-1 flex items-start sm:items-center justify-center px-4 pb-10">
-        <div className={cn("w-full card bg-white text-ink dark:bg-ink-2 dark:text-slate-100 p-6 sm:p-8", wide ? "max-w-xl" : "max-w-md")}>
+    <AuthLayout>
+      <div className="flex-1 flex items-start sm:items-center justify-center px-4 py-10">
+        <div className={cn("w-full card bg-white text-ink dark:bg-ink-2 dark:text-slate-100 p-6 sm:p-8 shadow-float", wide ? "max-w-xl" : "max-w-md")}>
           <h1 className="font-display text-2xl font-bold">{title}</h1>
           {sub && <p className="muted mt-1 text-sm">{sub}</p>}
           <div className="mt-6">{children}</div>
         </div>
       </div>
-    </div>
+    </AuthLayout>
   );
 }
 

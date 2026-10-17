@@ -1,53 +1,34 @@
-import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
 import { toast } from "sonner";
-import { Gauge, Receipt, Wrench, Menu, X } from "lucide-react";
+import { Gauge, Receipt, Wrench } from "lucide-react";
 import { LoginSchema } from "@motatto/shared";
 import { errorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Button, Input } from "@/components/ui";
-import { Logo } from "@/components/layout/Logo";
-import { cn } from "@/lib/utils";
+import { AuthLayout } from "@/layouts/AuthLayout";
 import "./login.css";
 
-const navLinks = [
-  { to: "/como-funciona", label: "Cómo funciona" },
-  { to: "/precios", label: "Precios" },
-  { to: "/nosotros", label: "Nosotros" },
-];
-
-function LoginHeader() {
-  const [open, setOpen] = useState(false);
+/** Floating embers that rise behind the hero. Positions are deterministic so the layout is stable. */
+function Sparks({ count = 22 }: { count?: number }) {
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-ink/85 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-        <Link to="/" aria-label="Motatto, inicio"><Logo light /></Link>
-        <nav className="hidden md:flex items-center gap-1">
-          {navLinks.map((l) => (
-            <Link key={l.to} to={l.to} className="rounded-full px-3.5 py-2 text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white">
-              {l.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="hidden md:flex items-center gap-2">
-          <Link to="/registro"><Button size="sm">Registrar mi taller</Button></Link>
-        </div>
-        <button className="md:hidden tap inline-flex items-center justify-center rounded-btn text-white" onClick={() => setOpen((v) => !v)} aria-label="Menú" aria-expanded={open}>
-          {open ? <X /> : <Menu />}
-        </button>
-      </div>
-      {open && (
-        <nav className="md:hidden border-t border-white/10 px-4 py-3 flex flex-col gap-1">
-          {navLinks.map((l) => (
-            <Link key={l.to} to={l.to} onClick={() => setOpen(false)} className="rounded-btn px-3 py-3 text-base font-medium text-slate-200 hover:bg-white/10">{l.label}</Link>
-          ))}
-          <Link to="/registro" onClick={() => setOpen(false)} className="mt-2"><Button full>Registrar mi taller</Button></Link>
-        </nav>
-      )}
-    </header>
+    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+      {Array.from({ length: count }, (_, i) => (
+        <span
+          key={i}
+          className="lg-spark"
+          style={{
+            ["--x" as string]: `${(i * 37) % 100}%`,
+            ["--s" as string]: `${3 + (i % 4) * 2}px`,
+            ["--d" as string]: `${5 + (i % 5) * 1.6}s`,
+            ["--delay" as string]: `${-((i * 0.9) % 7)}s`,
+            ["--drift" as string]: `${((i % 7) - 3) * 14}`,
+          }}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -72,7 +53,7 @@ function Wheel({ cx, cy }: { cx: number; cy: number }) {
   );
 }
 
-/** Animated high-displacement sport bike. Decorative, so it is hidden from assistive tech. */
+/** Animated sport bike. Decorative, so it is hidden from assistive tech. */
 function BikeScene() {
   return (
     <svg viewBox="0 0 640 330" className="w-full h-auto max-w-xl" aria-hidden focusable="false">
@@ -110,7 +91,7 @@ function BikeScene() {
         ))}
         {/* Tank with displacement sticker */}
         <path d="M236 178 Q250 128 318 126 Q352 126 368 146 L338 178 Z" fill="#F0611A" />
-        <text x="296" y="164" fontSize="15" fontWeight="800" fill="#ffffff" fontFamily="Sora, sans-serif" textAnchor="middle" letterSpacing="1">1000 CC</text>
+        <text x="296" y="164" fontSize="15" fontWeight="800" fill="#ffffff" fontFamily="Sora, sans-serif" textAnchor="middle" letterSpacing="1">TU MOTO</text>
         {/* Seat */}
         <path d="M196 178 Q226 160 268 168 L256 186 L200 190 Z" fill="#111827" />
         {/* Fairing and headlight */}
@@ -132,12 +113,14 @@ function BikeScene() {
 
 function Hero() {
   const perks = [
-    { icon: Gauge, text: "Motos de alto cilindraje, atendidas como se debe" },
+    { icon: Gauge, text: "Todo tipo de motos, atendidas como se debe" },
     { icon: Wrench, text: "Repuestos con foto y stock al día" },
     { icon: Receipt, text: "Facturas en segundos, incluso dictándolas" },
   ];
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-ink via-ink-2 to-[#2a1408] px-6 py-10 sm:px-10 lg:py-16 flex flex-col justify-center">
+    <section className="lg-scan relative overflow-hidden bg-gradient-to-br from-ink via-ink-2 to-[#2a1408] px-6 py-10 sm:px-10 lg:py-16 flex flex-col justify-center">
+      <div aria-hidden className="lg-grid-bg pointer-events-none absolute inset-0" />
+      <Sparks />
       {/* Glow behind the bike */}
       <div aria-hidden className="pointer-events-none absolute -top-24 right-[-10%] h-96 w-96 rounded-full bg-motor/25 blur-3xl" />
       <div aria-hidden className="pointer-events-none absolute bottom-0 left-0 h-40 w-full bg-gradient-to-t from-ink to-transparent" />
@@ -146,7 +129,7 @@ function Hero() {
           Taller de motos y carros
         </p>
         <h2 className="lg-rise mt-4 font-display text-3xl sm:text-4xl lg:text-5xl font-extrabold leading-tight text-white" style={{ animationDelay: "0.08s" }}>
-          Tu taller, <span className="text-motor">a toda marcha.</span>
+          Tu taller, <span className="lg-gradient-text">a toda marcha.</span>
         </h2>
         <p className="lg-rise mt-3 max-w-md text-slate-300" style={{ animationDelay: "0.16s" }}>
           Órdenes, facturas, inventario con fotos y caja. Todo desde el celular, sin perder el ritmo de la rodada.
@@ -176,12 +159,11 @@ export function Login() {
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.infer<typeof LoginSchema>>({ resolver: zodResolver(LoginSchema) });
 
   return (
-    <div className="min-h-dvh flex flex-col bg-ink text-slate-100">
-      <LoginHeader />
-      <main className="flex-1 grid lg:grid-cols-2">
+    <AuthLayout>
+      <div className="flex-1 grid lg:grid-cols-2">
         <Hero />
-        <div className="flex items-center justify-center px-4 py-10 sm:py-14 bg-slate-50 dark:bg-ink">
-          <div className={cn("lg-rise relative w-full max-w-md overflow-hidden rounded-2xl bg-white text-ink shadow-float dark:bg-ink-2 dark:text-slate-100 p-6 sm:p-8")}>
+        <div className="flex items-center justify-center px-4 py-10 sm:py-14 bg-slate-50 dark:bg-ink-2">
+          <div className="lg-rise w-full max-w-md"><div className="lg-ring shadow-float"><div className="relative overflow-hidden rounded-[0.9rem] bg-white text-ink dark:bg-ink-2 dark:text-slate-100 p-6 sm:p-8">
             <div aria-hidden className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-motor via-amber to-motor" />
             <h1 className="font-display text-2xl font-bold">Ingresar</h1>
             <p className="muted mt-1 text-sm">Entra con el correo de tu taller.</p>
@@ -195,16 +177,16 @@ export function Login() {
             })}>
               <Input label="Correo" type="email" autoComplete="email" inputMode="email" {...register("email")} error={errors.email?.message} />
               <Input label="Contraseña" type="password" autoComplete="current-password" {...register("password")} error={errors.password?.message} />
-              <div className="lg-shine rounded-btn">
+              <div className="lg-shine lg-pulse rounded-btn">
                 <Button type="submit" full size="lg" loading={isSubmitting}>Entrar al taller</Button>
               </div>
             </form>
             <p className="mt-6 text-center text-sm muted">
               ¿Aún no tienes taller? <Link to="/registro" className="font-semibold text-motor-dark dark:text-orange-300">Regístralo gratis</Link>
             </p>
-          </div>
+          </div></div></div>
         </div>
-      </main>
-    </div>
+      </div>
+    </AuthLayout>
   );
 }

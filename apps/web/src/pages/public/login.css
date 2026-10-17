@@ -37,3 +37,75 @@
   background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%);
   animation: lg-shine 2.8s ease-in-out infinite;
 }
+
+/* ---- Efectos extra: chispas, cuadrícula, barrido, borde girando, título y botón ---- */
+@property --lg-a { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+
+@keyframes lg-rot { to { --lg-a: 360deg; } }
+@keyframes lg-float {
+  0% { transform: translate3d(0, 0, 0); opacity: 0; }
+  10% { opacity: 0.95; }
+  90% { opacity: 0.6; }
+  100% { transform: translate3d(calc(var(--drift) * 1px), -115vh, 0); opacity: 0; }
+}
+@keyframes lg-grid { to { background-position: 0 40px; } }
+@keyframes lg-scan { from { transform: translateY(-10%); } to { transform: translateY(110vh); } }
+@keyframes lg-hue { to { background-position: 200% 50%; } }
+@keyframes lg-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(240, 97, 26, 0.55); }
+  50% { box-shadow: 0 0 0 10px rgba(240, 97, 26, 0); }
+}
+
+.lg-spark {
+  position: absolute;
+  bottom: -12px;
+  left: var(--x);
+  width: var(--s);
+  height: var(--s);
+  border-radius: 9999px;
+  background: radial-gradient(circle, #fde68a 0%, #f0611a 55%, transparent 72%);
+  box-shadow: 0 0 10px rgba(240, 97, 26, 0.8);
+  animation: lg-float var(--d) linear var(--delay) infinite;
+  pointer-events: none;
+}
+
+.lg-grid-bg {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+  animation: lg-grid 3s linear infinite;
+  mask-image: radial-gradient(ellipse at 40% 40%, #000 30%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse at 40% 40%, #000 30%, transparent 75%);
+}
+
+.lg-scan::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 120px;
+  background: linear-gradient(180deg, transparent, rgba(240, 97, 26, 0.12), transparent);
+  animation: lg-scan 6s linear infinite;
+  pointer-events: none;
+}
+
+.lg-ring {
+  position: relative;
+  padding: 2px;
+  border-radius: 1rem;
+  background: conic-gradient(from var(--lg-a), #f0611a, #f5a524, transparent 40%, #f0611a 70%, transparent);
+  animation: lg-rot 4s linear infinite;
+}
+
+.lg-gradient-text {
+  background: linear-gradient(90deg, #f0611a, #f5a524, #fde68a, #f0611a);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: lg-hue 5s linear infinite;
+}
+
+.lg-pulse { animation: lg-pulse 2.2s ease-out infinite; border-radius: 0.75rem; }
