@@ -348,7 +348,10 @@ function groundAnswer(p: AssistantProposal, cat: Catalog): AssistantProposal {
   if (p.intent !== "consultar_precio" && p.intent !== "consultar_stock") return p;
   const prods = p.items.filter((i) => i.productId).map((i) => cat.products.find((x) => x.id === i.productId)!);
   const servs = p.items.filter((i) => i.serviceId).map((i) => cat.services.find((x) => x.id === i.serviceId)!);
-  if (!prods.length && !servs.length) return p;
+  if (!prods.length && !servs.length) {
+    // Sin coincidencia en el catálogo: nunca dejar que el modelo afirme precios o stock.
+    return { ...p, answer: `No encontré "${p.unrecognized[0] ?? "ese producto"}" en tu catálogo. Revisa el nombre o agrégalo en Inventario.` };
+  }
   const parts = [
     ...prods.map((x) => `${x.name}: ${fmt(x.price)}, ${x.stock > 0 ? `hay ${x.stock} en stock` : "sin stock"}`),
     ...servs.map((x) => `${x.name}: ${fmt(x.suggestedPrice)} (mano de obra)`),
