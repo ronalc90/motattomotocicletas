@@ -6,7 +6,8 @@ import { SuperadminShell } from "@/layouts/SuperadminShell";
 import { RequireCan, RequireSuperadmin, RequireTenantUser } from "@/components/layout/Guards";
 import { PageLoader } from "@/components/ui";
 import { Landing } from "@/pages/public/Landing";
-import { Login, Registro, Invitacion } from "@/pages/public/Auth";
+import { Registro, Invitacion } from "@/pages/public/Auth";
+import { Login } from "@/pages/public/Login";
 import { NotFound } from "@/pages/NotFound";
 
 const ComoFunciona = lazy(() => import("@/pages/public/ComoFunciona").then((m) => ({ default: m.ComoFunciona })));

@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Bike, Car, CarFront } from "lucide-react";
-import { LoginSchema, RegisterTenantSchema, ROLE_LABEL, type Role, type Tenant } from "@motatto/shared";
+import { RegisterTenantSchema, ROLE_LABEL, type Role, type Tenant } from "@motatto/shared";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth, type AuthUser } from "@/lib/auth";
 import { Button, Input, PageLoader } from "@/components/ui";
@@ -24,30 +24,6 @@ function AuthFrame({ title, sub, children, wide }: { title: string; sub?: string
         </div>
       </div>
     </div>
-  );
-}
-
-export function Login() {
-  const { login } = useAuth();
-  const nav = useNavigate();
-  const loc = useLocation() as { state?: { from?: string } };
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.infer<typeof LoginSchema>>({ resolver: zodResolver(LoginSchema) });
-  return (
-    <AuthFrame title="Ingresar" sub="Entra con el correo de tu taller.">
-      <form className="space-y-4" onSubmit={handleSubmit(async (v) => {
-        try {
-          const r = await login(v.email, v.password);
-          const from = loc.state?.from;
-          if (r.user.role === "superadmin") nav("/superadmin", { replace: true });
-          else nav(from && from.startsWith("/app") ? from : "/app", { replace: true });
-        } catch (e) { toast.error(errorMessage(e)); }
-      })}>
-        <Input label="Correo" type="email" autoComplete="email" inputMode="email" {...register("email")} error={errors.email?.message} />
-        <Input label="Contraseña" type="password" autoComplete="current-password" {...register("password")} error={errors.password?.message} />
-        <Button type="submit" full size="lg" loading={isSubmitting}>Entrar</Button>
-      </form>
-      <p className="mt-6 text-sm text-center muted">¿Aún no tienes taller? <Link to="/registro" className="font-semibold text-motor-dark">Regístralo gratis</Link></p>
-    </AuthFrame>
   );
 }
 

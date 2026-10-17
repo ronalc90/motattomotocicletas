@@ -1,0 +1,39 @@
+/* Login: animaciones de la moto y la carretera. Se desactivan con prefers-reduced-motion (ver index.css). */
+
+@keyframes lg-spin { to { transform: rotate(360deg); } }
+@keyframes lg-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2.5px); } }
+@keyframes lg-puff {
+  0% { transform: translate(0, 0) scale(0.4); opacity: 0; }
+  15% { opacity: 0.6; }
+  100% { transform: translate(-64px, -86px) scale(2.4); opacity: 0; }
+}
+@keyframes lg-speed {
+  0% { transform: translateX(640px); opacity: 0; }
+  20% { opacity: 0.9; }
+  100% { transform: translateX(-200px); opacity: 0; }
+}
+@keyframes lg-glow { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+@keyframes lg-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes lg-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes lg-shine { 0% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+@keyframes lg-dash { to { stroke-dashoffset: -64; } }
+@keyframes lg-beam { 0%, 100% { opacity: 0.55; } 50% { opacity: 0.85; } }
+
+.lg-wheel { transform-box: fill-box; transform-origin: center; animation: lg-spin 0.9s linear infinite; }
+.lg-bike { transform-box: fill-box; transform-origin: center; animation: lg-bob 0.7s ease-in-out infinite; }
+.lg-puff { transform-box: fill-box; transform-origin: center; animation: lg-puff 2.4s ease-out infinite; }
+.lg-speed { animation: lg-speed 1.6s linear infinite; }
+.lg-glow { animation: lg-glow 1.8s ease-in-out infinite; }
+.lg-beam { animation: lg-beam 1.8s ease-in-out infinite; }
+.lg-dash { animation: lg-dash 0.5s linear infinite; }
+.lg-rise { animation: lg-rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.lg-fade { animation: lg-fade 0.9s ease-out both; }
+.lg-shine { position: relative; overflow: hidden; }
+.lg-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%);
+  animation: lg-shine 2.8s ease-in-out infinite;
+}
