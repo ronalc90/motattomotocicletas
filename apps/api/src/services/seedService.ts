@@ -71,6 +71,12 @@ export async function runSeed(): Promise<SeedResult> {
   const tenantId = tenant._id;
 
   let owner = await User.findOne({ email: "dirox7@gmail.com" });
+  if (owner && owner.role === "superadmin" && config.superadminEmail !== "dirox7@gmail.com") {
+    // The owner address was previously seeded as superadmin; hand it back to the tenant.
+    owner.set({ tenantId, role: "dueno", name: "Ronal" });
+    await owner.save();
+    logger.info("seed: owner converted from superadmin to dueno");
+  }
   if (!owner) {
     owner = await User.create({
       tenantId,
