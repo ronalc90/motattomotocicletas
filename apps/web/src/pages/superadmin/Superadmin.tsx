@@ -8,7 +8,7 @@ import { ROLE_LABEL, type Paginated, type Tenant, type User } from "@motatto/sha
 import { api, errorMessage, tokenStore } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useDebounce } from "@/hooks/useDebounce";
-import { Badge, Button, Card, CardTitle, ConfirmDialog, DataTable, EmptyState, PageHeader, PageLoader, PlanBadge, SearchBox, Select, Stat, TenantStatusBadge } from "@/components/ui";
+import { Badge, Button, Card, CardTitle, ConfirmDialog, DataTable, EmptyState, Input, Modal, PageHeader, PageLoader, PlanBadge, SearchBox, Select, Stat, TenantStatusBadge } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 
 type SaTenant = Tenant & { usage: { usersCount: number; productsCount: number; ordersThisMonth: number; ordersTotal: number } };
@@ -116,8 +116,44 @@ export function SaTenantDetail() {
         <CardTitle>Usuarios</CardTitle>
         <ul className="divide-y line -mx-4 sm:-mx-5 text-sm">{t.users.map((u) => <li key={u.id} className="px-4 sm:px-5 py-2 flex items-center gap-3"><span className="flex-1 min-w-0"><span className="font-medium">{u.name}</span><span className="block text-xs muted">{u.email}</span></span><Badge>{ROLE_LABEL[u.role]}</Badge>{!u.active && <Badge tone="amber">inactivo</Badge>}<span className="text-xs muted">{u.lastLoginAt ? fmtDate(u.lastLoginAt) : "nunca"}</span></li>)}</ul>
       </Card>
+      <PurgeCard tenantId={t.id} name={t.name} slug={t.slug} />
       <ConfirmDialog open={impOpen} onClose={() => setImpOpen(false)} onConfirm={() => imp.mutate()} loading={imp.isPending} title={`¿Entrar a ${t.name} como soporte?`} message="Verás el taller como su dueño durante 4 horas. La acción queda registrada en la auditoría del taller." confirmText="Entrar" />
     </div>
+  );
+}
+
+/** Elimina el taller con todos sus datos. Irreversible: exige escribir el slug exacto. */
+export function PurgeCard({ tenantId, name, slug }: { tenantId: string; name: string; slug: string }) {
+  const qc = useQueryClient();
+  const nav = useNavigate();
+  const [typed, setTyped] = useState("");
+  const [open, setOpen] = useState(false);
+  const del = useMutation({
+    mutationFn: () => api.delete<{ deleted: boolean; counts: Record<string, number> }>(`/superadmin/tenants/${tenantId}`, { confirm: typed }),
+    onSuccess: () => {
+      toast.success(`Taller "${name}" eliminado`);
+      qc.invalidateQueries({ queryKey: ["sa-tenants"] });
+      qc.invalidateQueries({ queryKey: ["sa-users"] });
+      nav("/superadmin/talleres", { replace: true });
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  return (
+    <Card className="border-bad/40">
+      <CardTitle>Zona de peligro</CardTitle>
+      <p className="text-sm muted mb-3">Eliminar el taller borra para siempre sus usuarios, clientes, vehículos, productos, órdenes, pagos, caja y facturas. No se puede deshacer. Si solo quieres cortarle el acceso, suspéndelo arriba.</p>
+      <Button variant="danger" onClick={() => { setTyped(""); setOpen(true); }}>Eliminar taller</Button>
+      <Modal open={open} onClose={() => setOpen(false)} title={`Eliminar ${name}`} size="sm"
+        footer={<>
+          <Button variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button variant="danger" onClick={() => del.mutate()} loading={del.isPending} disabled={typed !== slug}>Eliminar para siempre</Button>
+        </>}>
+        <div className="space-y-3">
+          <p className="text-sm">Para confirmar, escribe el slug del taller: <code className="font-mono font-semibold">{slug}</code></p>
+          <Input label="Slug del taller" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" />
+        </div>
+      </Modal>
+    </Card>
   );
 }
 

@@ -76,7 +76,7 @@ export const api = {
   get: <T>(path: string, query?: Query) => request<T>("GET", path, undefined, { query }),
   post: <T>(path: string, body?: unknown) => request<T>("POST", path, body),
   patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, body),
-  delete: <T>(path: string) => request<T>("DELETE", path),
+  delete: <T>(path: string, body?: unknown) => request<T>("DELETE", path, body),
   blob: (path: string, query?: Query) => request<Blob>("GET", path, undefined, { query, raw: true }),
   /** multipart upload: fields + one file under `field` */
   upload: <T>(path: string, file: File | Blob, field = "file", extra: Record<string, string> = {}) => {

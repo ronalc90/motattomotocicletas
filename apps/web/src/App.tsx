@@ -34,6 +34,8 @@ const SaStats = lazy(() => import("@/pages/superadmin/Superadmin").then((m) => (
 const SaTenants = lazy(() => import("@/pages/superadmin/Superadmin").then((m) => ({ default: m.SaTenants })));
 const SaTenantDetail = lazy(() => import("@/pages/superadmin/Superadmin").then((m) => ({ default: m.SaTenantDetail })));
 const SaAi = lazy(() => import("@/pages/superadmin/Superadmin").then((m) => ({ default: m.SaAi })));
+const SaUsers = lazy(() => import("@/pages/superadmin/SuperadminUsers").then((m) => ({ default: m.SaUsers })));
+const SaMetrics = lazy(() => import("@/pages/superadmin/SuperadminUsers").then((m) => ({ default: m.SaMetrics })));
 
 export function App() {
   return (
@@ -77,6 +79,8 @@ export function App() {
             <Route path="talleres" element={<SaTenants />} />
             <Route path="talleres/:id" element={<SaTenantDetail />} />
             <Route path="ia" element={<SaAi />} />
+            <Route path="usuarios" element={<SaUsers />} />
+            <Route path="metricas" element={<SaMetrics />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />

@@ -217,6 +217,10 @@ superadminRouter.patch(
     const input = parseBody(UpdateUserSchema, req);
     const user = await User.findById(req.params.id);
     if (!user || user.role === "superadmin") throw notFound("Usuario");
+    // El dueño no cambia de rol ni se desactiva desde aquí: para cortar un taller se suspende el taller.
+    if (user.role === "dueno" && (input.role !== undefined || input.active === false)) {
+      throw badRequest("El dueño no se cambia de rol ni se desactiva; suspende el taller en su lugar", "OWNER_PROTECTED");
+    }
     const before = publicUser(user);
     if (input.name !== undefined) user.name = input.name;
     if (input.role !== undefined) user.role = input.role;
