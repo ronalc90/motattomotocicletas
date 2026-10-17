@@ -347,9 +347,9 @@ function sanitizeAction(raw: unknown, cat: Catalog): AssistantAction | undefined
     if (!name) return undefined;
     const v = a.vehiculo && typeof a.vehiculo === "object" ? (a.vehiculo as Record<string, unknown>) : null;
     const brand = v ? str(v.marca) : undefined;
-    const model = v ? str(v.modelo) : undefined;
+    const model = v ? str(v.modelo) ?? "Sin especificar" : undefined;
     const plate = v ? str(v.placa)?.toUpperCase().replace(/\s+/g, "") : undefined;
-    const vehicle = brand && model ? { kind: (v?.tipo === "carro" ? "carro" : "moto") as VehicleKind, brand, model, plate } : undefined;
+    const vehicle = brand ? { kind: (v?.tipo === "carro" ? "carro" : "moto") as VehicleKind, brand, model: model!, plate } : undefined;
     return { kind: "crear_cliente", name, phone: str(a.telefono), vehicle };
   }
   if (tipo === "entrada_stock") {
