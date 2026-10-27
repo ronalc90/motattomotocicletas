@@ -95,7 +95,7 @@ describe("order flow", () => {
     expect(inv.body.text).toContain("Recargo Nequi (3%)");
     expect(inv.body.text).toContain("Bujía central NS 200 x2");
     expect(inv.body.whatsappUrl).toMatch(/^https:\/\/wa\.me\/573214229804\?text=/);
-    expect(inv.body.publicUrl).toBe(`http://web.test/cc/${s.slug}/${order.number}`);
+    expect(inv.body.publicUrl).toMatch(new RegExp(`^http://web\\.test/cc/${s.slug}/${order.number}\\?k=[A-Za-z0-9_-]{24}$`));
     expect(inv.body.invoice.items[0].unitCost).toBeUndefined();
 
     // cash day shows the payment

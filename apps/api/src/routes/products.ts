@@ -22,10 +22,17 @@ const ProductQuery = ListQuerySchema.extend({
   includeInactive: z.string().optional(),
 });
 
-function present(req: Parameters<typeof scope>[0], p: ProductDoc) {
+export function present(req: Parameters<typeof scope>[0], p: ProductDoc) {
   const json = p.toJSON() as unknown as Record<string, unknown>;
   delete json.lastLabelOcr;
   if (!hasPerm(req, "inventory:cost")) delete json.cost;
+  return json;
+}
+
+/** Movimiento de stock sin el costo unitario para quien no tiene inventory:cost. */
+function presentMovement(req: Parameters<typeof scope>[0], m: { toJSON(): unknown }) {
+  const json = m.toJSON() as Record<string, unknown>;
+  if (!hasPerm(req, "inventory:cost")) delete json.unitCost;
   return json;
 }
 
@@ -308,7 +315,7 @@ productsRouter.get(
     const p = await Product.findOne({ _id: req.params.id, ...scope(req) });
     if (!p) throw notFound("Producto");
     const movements = await StockMovement.find({ ...scope(req), productId: p._id }).sort({ createdAt: -1 }).limit(200);
-    res.json({ ...present(req, p), movements: movements.map((m) => m.toJSON()) });
+    res.json({ ...present(req, p), movements: movements.map((m) => presentMovement(req, m)) });
   }),
 );
 
@@ -357,7 +364,11 @@ productsRouter.post(
     if (!p) throw notFound("Producto");
     if (input.type === "ajuste" && !hasPerm(req, "inventory:manage")) throw badRequest("Solo dueño/admin pueden hacer ajustes", "FORBIDDEN");
     if (input.type === "entrada" && input.qty <= 0) throw badRequest("La cantidad de una entrada debe ser mayor que 0");
-    const unitCost = input.unitCost ?? p.cost;
+    // Sin inventory:cost no se fija el costo; registrar el gasto exige además cash:write (igual que en la interfaz).
+    const canCost = hasPerm(req, "inventory:cost");
+    const inputCost = canCost ? input.unitCost : undefined;
+    const registerExpense = input.registerExpense && canCost && hasPerm(req, "cash:write");
+    const unitCost = inputCost ?? p.cost;
     const mv = await StockMovement.create({
       ...scope(req),
       productId: p._id,
@@ -371,10 +382,10 @@ productsRouter.post(
     });
     const before = p.stock;
     p.stock += input.qty;
-    if (input.type === "entrada" && input.unitCost !== undefined) p.cost = input.unitCost;
+    if (input.type === "entrada" && inputCost !== undefined) p.cost = inputCost;
     await p.save();
     let expense: unknown;
-    if (input.type === "entrada" && input.registerExpense && unitCost > 0) {
+    if (input.type === "entrada" && registerExpense && unitCost > 0) {
       const e = await Expense.create({
         ...scope(req),
         concept: `Compra ${p.name} x${input.qty}${input.supplier ? ` (${input.supplier})` : ""}`,
@@ -388,7 +399,7 @@ productsRouter.post(
       expense = e.toJSON();
     }
     await audit(req, `stock.${input.type}`, "product", p._id, { stock: before }, { stock: p.stock, qty: input.qty, movementId: String(mv._id) });
-    res.status(201).json({ ...present(req, p), movement: mv.toJSON(), expense });
+    res.status(201).json({ ...present(req, p), movement: presentMovement(req, mv), expense });
   }),
 );
 

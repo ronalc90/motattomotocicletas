@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Copy, Download, MessageCircle, Printer, Share2 } from "lucide-react";
 import type { PublicInvoice } from "@motatto/shared";
@@ -14,10 +14,12 @@ import { useState } from "react";
 
 export function PublicInvoicePage() {
   const { tenantSlug = "", number = "" } = useParams();
-  const q = useQuery({ queryKey: ["public-invoice", tenantSlug, number], queryFn: () => api.get<PublicInvoice>(`/public/invoices/${tenantSlug}/${number}`) });
+  // Clave aleatoria del link (?k=): sin ella la API no muestra la cuenta de cobro.
+  const k = useSearchParams()[0].get("k") ?? "";
+  const q = useQuery({ queryKey: ["public-invoice", tenantSlug, number, k], queryFn: () => api.get<PublicInvoice>(`/public/invoices/${tenantSlug}/${number}`, { k }) });
   const [pdfLoading, setPdfLoading] = useState(false);
   const inv = q.data;
-  const pdfApi = `${API_BASE}/public/invoices/${tenantSlug}/${number}/pdf`;
+  const pdfApi = `${API_BASE}/public/invoices/${tenantSlug}/${number}/pdf?k=${encodeURIComponent(k)}`;
 
   async function pdf() {
     if (!inv) return;

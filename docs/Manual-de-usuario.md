@@ -58,7 +58,7 @@ En la orden: **WhatsApp** (abre el chat del cliente con el texto), **Copiar text
 
 ## 3. Cliente del taller
 
-No necesitas cuenta. El taller te envía un link como `motattomotocicletas.com/cc/motatto/MT-2026-0001`:
+No necesitas cuenta. El taller te envía un link como `motattomotocicletas.com/cc/motatto/MT-2026-0001?k=…` (la clave `k` es única de tu cuenta; sin ella el link no abre):
 - Ves tu cuenta de cobro completa, el total y la garantía vigente.
 - **Descargar PDF**, **Copiar texto**, **Escribir al taller** por WhatsApp.
 

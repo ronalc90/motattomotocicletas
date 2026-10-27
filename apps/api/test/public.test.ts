@@ -25,7 +25,10 @@ describe("public invoice", () => {
       .send({ customerId, vehicleId, internalNotes: "secreto", items: [{ type: "repuesto", productId: product.id, description: "Bujía", qty: 1, unitPrice: 32000 }] });
     await request(app).post(`/api/orders/${o.body.id}/pay`).set(bearer(s)).send({ method: "efectivo" });
 
-    const pub = await request(app).get(`/api/public/invoices/${s.slug}/${o.body.number}`);
+    // La clave aleatoria del link sale del publicUrl de la factura (API autenticada).
+    const inv = await request(app).get(`/api/orders/${o.body.id}/invoice`).set(bearer(s));
+    const k = new URL(inv.body.publicUrl).searchParams.get("k");
+    const pub = await request(app).get(`/api/public/invoices/${s.slug}/${o.body.number}?k=${k}`);
     expect(pub.status).toBe(200);
     expect(pub.body.number).toBe(o.body.number);
     expect(pub.body.status).toBe("pagada");
@@ -36,7 +39,7 @@ describe("public invoice", () => {
     expect(JSON.stringify(pub.body)).not.toContain("unitCost");
     expect(pub.body.warrantyUntil).toBeDefined();
 
-    const pdf = await request(app).get(`/api/public/invoices/${s.slug}/${o.body.number}/pdf`).buffer(true).parse((res, cb) => {
+    const pdf = await request(app).get(`/api/public/invoices/${s.slug}/${o.body.number}/pdf?k=${k}`).buffer(true).parse((res, cb) => {
       const chunks: Buffer[] = [];
       res.on("data", (c: Buffer) => chunks.push(c));
       res.on("end", () => cb(null, Buffer.concat(chunks)));
@@ -49,15 +52,15 @@ describe("public invoice", () => {
     const authPdf = await request(app).get(`/api/orders/${o.body.id}/pdf`).set(bearer(s));
     expect(authPdf.headers["content-type"]).toBe("application/pdf");
 
-    expect((await request(app).get(`/api/public/invoices/${s.slug}/NOPE-2026-9999`)).status).toBe(404);
-    expect((await request(app).get(`/api/public/invoices/otro-taller/${o.body.number}`)).status).toBe(404);
+    expect((await request(app).get(`/api/public/invoices/${s.slug}/NOPE-2026-9999?k=${k}`)).status).toBe(404);
+    expect((await request(app).get(`/api/public/invoices/otro-taller/${o.body.number}?k=${k}`)).status).toBe(404);
     const t = await request(app).get(`/api/public/tenants/${s.slug}`);
     expect(t.status).toBe(200);
     expect(t.body.name).toBe("Motatto Test");
 
     // voided orders still resolve with status anulada
     await request(app).post(`/api/orders/${o.body.id}/status`).set(bearer(s)).send({ status: "anulada", voidReason: "prueba" });
-    const voided = await request(app).get(`/api/public/invoices/${s.slug}/${o.body.number}`);
+    const voided = await request(app).get(`/api/public/invoices/${s.slug}/${o.body.number}?k=${k}`);
     expect(voided.status).toBe(200);
     expect(voided.body.status).toBe("anulada");
   });

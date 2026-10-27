@@ -1,5 +1,6 @@
 import type { Request } from "express";
 import { Types } from "mongoose";
+import { nanoid } from "nanoid";
 import {
   computeTotals,
   ORDER_TRANSITIONS,
@@ -49,8 +50,10 @@ export async function nextOrderNumber(tenant: TenantDoc): Promise<string> {
   return `${prefix}-${year}-${String(seq).padStart(4, "0")}`;
 }
 
+type PrevItem = { _id?: unknown; productId?: unknown; serviceId?: unknown; unitPrice: number };
+
 /** Resolves order items: copies description/cost from catalog, enforces price/discount permissions. */
-export async function buildItems(req: Request, inputs: OrderItemInput[]) {
+export async function buildItems(req: Request, inputs: OrderItemInput[], previous: readonly PrevItem[] = []) {
   const canPrice = hasPerm(req, "orders:price");
   const productIds = inputs.filter((i) => i.productId).map((i) => i.productId!);
   const serviceIds = inputs.filter((i) => i.serviceId).map((i) => i.serviceId!);
@@ -76,6 +79,10 @@ export async function buildItems(req: Request, inputs: OrderItemInput[]) {
       if (!s) throw notFound("Servicio");
       if (!description) description = s.name;
       if (!canPrice) unitPrice = s.suggestedPrice;
+    } else if (!canPrice) {
+      // Línea libre sin permiso de precio: conserva el precio que ya tenía (por id) o queda en 0.
+      const prev = i.id ? previous.find((x) => String(x._id) === i.id && !x.productId && !x.serviceId) : undefined;
+      unitPrice = prev?.unitPrice ?? 0;
     }
     const qty = i.qty ?? 1;
     return {
@@ -134,6 +141,7 @@ export async function createOrder(req: Request, input: OrderInput): Promise<Orde
   const order = new Order({
     ...scope(req),
     number: await nextOrderNumber(tenant),
+    publicToken: newPublicToken(),
     customerId: input.customerId,
     vehicleId: input.vehicleId,
     km: input.km,
@@ -170,7 +178,7 @@ export async function updateOrder(req: Request, order: OrderDoc, input: Partial<
     order.vehicleId = new Types.ObjectId(vehicleId);
   }
   if (input.items) {
-    const items = await buildItems(req, input.items);
+    const items = await buildItems(req, input.items, order.items);
     order.set("items", items);
   }
   if (input.discount !== undefined) {
@@ -455,6 +463,19 @@ export function buildPublicInvoice(
   };
 }
 
+/** Clave del link público: aleatoria (144 bits), no se deduce del slug ni del número consecutivo. */
+export const newPublicToken = (): string => nanoid(24);
+
+/** Devuelve la clave pública de la orden; a las órdenes anteriores a la clave se les asigna una (una sola vez). */
+export async function ensurePublicToken(order: OrderDoc): Promise<string> {
+  if (order.publicToken) return order.publicToken;
+  await Order.updateOne({ _id: order._id, publicToken: null }, { $set: { publicToken: newPublicToken() } });
+  const saved = await Order.findById(order._id).select("publicToken").lean();
+  if (!saved?.publicToken) throw notFound("Orden");
+  order.publicToken = saved.publicToken;
+  return saved.publicToken;
+}
+
 export async function invoicePayload(tenant: TenantDoc, order: OrderDoc) {
   const [customer, vehicle] = await Promise.all([
     Customer.findOne({ _id: order.customerId, tenantId: tenant._id }),
@@ -466,6 +487,6 @@ export async function invoicePayload(tenant: TenantDoc, order: OrderDoc) {
     invoice,
     text,
     whatsappUrl: whatsappLink(customer?.phone, text),
-    publicUrl: `${config.webUrl}/cc/${tenant.slug}/${order.number}`,
+    publicUrl: `${config.webUrl}/cc/${tenant.slug}/${order.number}?k=${await ensurePublicToken(order)}`,
   };
 }
