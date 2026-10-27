@@ -47,7 +47,7 @@ export function Cash() {
             <Stat label="Gastos" value={`$ ${formatMoney(d.totals.expenses)}`} tone="bad" />
             <Stat label="Neto del día" value={`$ ${formatMoney(d.totals.net)}`} tone="dark" className="col-span-2 lg:col-span-1" />
           </div>
-          <div className="grid lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card>
               <CardTitle>Pagos</CardTitle>
               {!d.payments.length ? <p className="text-sm muted">Sin pagos este día.</p> : (
@@ -55,7 +55,7 @@ export function Cash() {
                   {d.payments.map((p) => (
                     <li key={p.id} className="px-4 sm:px-5 py-2.5 flex items-center gap-3 text-sm">
                       <Badge tone={p.method === "efectivo" ? "ok" : p.method === "nequi" ? "violet" : "blue"}>{PAYMENT_METHOD_LABEL[p.method]}</Badge>
-                      <span className="flex-1 min-w-0"><Link to={`/app/ordenes/${p.orderId}`} className="font-medium hover:text-motor">{p.orderNumber ?? "Orden"}</Link><span className="block text-xs muted">{fmtDateTime(p.createdAt)}{p.reference && ` · ${p.reference}`}</span></span>
+                      <span className="flex-1 min-w-0"><Link to={`/app/ordenes/${p.orderId}`} className="font-medium hover:text-motor">{p.orderNumber ?? "Orden"}</Link><span className="block text-xs muted break-words">{fmtDateTime(p.createdAt)}{p.reference && ` · ${p.reference}`}</span></span>
                       <span className={`font-semibold tabular-nums ${p.voided ? "line-through muted" : ""}`}>{formatMoney(p.amount)}</span>
                     </li>
                   ))}

@@ -51,7 +51,7 @@ export function ProductDetail() {
         {can("inventory:manage") && <Button variant="secondary" icon={<Scale className="h-4 w-4" />} onClick={() => setAdjust(true)}>Ajustar (conteo)</Button>}
       </div>
       {p.compatibleWith.length > 0 && <div className="flex flex-wrap gap-1.5">{p.compatibleWith.map((c) => <Badge key={c} tone="blue">{c}</Badge>)}</div>}
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardTitle action={can("inventory:entry") && <PhotoInput size="sm" variant="outline" multiple onFiles={addPhoto}><Camera className="h-4 w-4" /> Foto</PhotoInput>}>Fotos</CardTitle>
           {!p.photos.length ? <div className="h-28 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center muted"><Package className="h-6 w-6" /></div> : (
