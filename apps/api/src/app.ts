@@ -2,9 +2,8 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import { pinoHttp } from "pino-http";
 import { config } from "./config.js";
-import { logger } from "./lib/logger.js";
+import { httpLogger, logger } from "./lib/logger.js";
 import { auth } from "./middleware/auth.js";
 import { errorHandler, notFoundHandler } from "./middleware/errors.js";
 import { uploadsDir } from "./services/storage.js";
@@ -45,9 +44,7 @@ export function createApp() {
   );
   app.use(express.json({ limit: "2mb" }));
   app.use(express.urlencoded({ extended: false, limit: "2mb" }));
-  if (!config.isTest) {
-    app.use(pinoHttp({ logger, autoLogging: { ignore: (req: { url?: string }) => req.url === "/health" } }));
-  }
+  if (!config.isTest) app.use(httpLogger(logger));
 
   app.get("/health", (_req, res) => res.json({ ok: true, uptime: process.uptime() }));
 
@@ -56,7 +53,11 @@ export function createApp() {
     rateLimit({ windowMs: 15 * 60 * 1000, limit: config.isTest ? 10000 : 60, standardHeaders: true, legacyHeaders: false }),
     authRouter,
   );
-  app.use("/api/public", publicRouter);
+  app.use(
+    "/api/public",
+    rateLimit({ windowMs: 15 * 60 * 1000, limit: config.isTest ? 10000 : 300, standardHeaders: true, legacyHeaders: false }),
+    publicRouter,
+  );
   app.use("/uploads", express.static(uploadsDir, { maxAge: "7d", index: false }));
   app.use("/api/superadmin", superadminRouter);
 

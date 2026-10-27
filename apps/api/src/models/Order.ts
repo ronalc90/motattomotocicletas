@@ -55,6 +55,8 @@ const OrderSchema = new Schema(
     voiceTranscript: { type: String },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     assignedTo: { type: Schema.Types.ObjectId, ref: "User" },
+    /** Clave aleatoria del link público (/cc/:slug/:number?k=...). Sin default: se asigna al crear o al pedir la factura. */
+    publicToken: { type: String },
   },
   { timestamps: true },
 );

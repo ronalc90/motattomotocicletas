@@ -1,9 +1,10 @@
 import { Router } from "express";
-import { requirePermission, requireTenant, scope, wrap } from "../middleware/auth.js";
+import { hasPerm, requirePermission, requireTenant, scope, wrap } from "../middleware/auth.js";
 import { Order, Product } from "../models/index.js";
 import { dayRange, monthStart, toDayString } from "../lib/dates.js";
 import { dayData } from "../services/cashService.js";
 import { decorate } from "../services/orderService.js";
+import { present } from "./products.js";
 
 export const dashboardRouter = Router();
 dashboardRouter.use(requireTenant, requirePermission("orders:read"));
@@ -29,12 +30,16 @@ dashboardRouter.get(
       Promise.all(open.map((o) => decorate(req, o))),
       Promise.all(warranties.map((o) => decorate(req, o))),
     ]);
+    // Ventas y gastos son datos de caja: solo para quien tiene cash:read (el mecánico no).
+    const showMoney = hasPerm(req, "cash:read");
     res.json({
       openOrders,
-      today: { sales: totals.sales, payments: totals.sales, expenses: totals.expenses, ordersPaid: ordersPaidToday },
-      lowStock: lowStock.map((p) => p.toJSON()),
+      today: showMoney
+        ? { sales: totals.sales, payments: totals.sales, expenses: totals.expenses, ordersPaid: ordersPaidToday }
+        : { ordersPaid: ordersPaidToday },
+      lowStock: lowStock.map((p) => present(req, p)),
       activeWarranties,
-      month: { sales: monthAgg[0]?.sales ?? 0, orders: monthAgg[0]?.orders ?? 0 },
+      month: showMoney ? { sales: monthAgg[0]?.sales ?? 0, orders: monthAgg[0]?.orders ?? 0 } : { orders: monthAgg[0]?.orders ?? 0 },
     });
   }),
 );

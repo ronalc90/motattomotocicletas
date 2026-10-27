@@ -30,7 +30,10 @@ describe("seed", () => {
     const login = await request(app).post("/api/auth/login").send({ email: "dirox7@gmail.com", password: "Motatto2026!" });
     expect(login.status).toBe(200);
     expect(login.body.tenant.slug).toBe("motatto");
-    const pub = await request(app).get(`/api/public/invoices/motatto/${order.number}`);
+    // La orden del seed no tiene clave: se le asigna al pedir su factura con sesión.
+    const inv = await request(app).get(`/api/orders/${order.id}/invoice`).set("Authorization", `Bearer ${login.body.token}`);
+    const k = new URL(inv.body.publicUrl).searchParams.get("k");
+    const pub = await request(app).get(`/api/public/invoices/motatto/${order.number}?k=${k}`);
     expect(pub.body.total).toBe(716000);
     expect(pub.body.tenant.paymentInfo).toBe("Nequi 321 422 9804");
 

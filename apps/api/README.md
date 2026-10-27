@@ -37,7 +37,7 @@ All responses: documents expose `id`, dates are ISO. Errors: `{ error: { code, m
 
 - `GET /health`
 - **Auth** `POST /api/auth/register|login|password`, `GET /api/auth/me`, `GET /api/auth/invite/:token`, `POST /api/auth/invite/accept`
-- **Public** `GET /api/public/tenants/:slug`, `GET /api/public/invoices/:tenantSlug/:number[/pdf]`
+- **Public** `GET /api/public/tenants/:slug`, `GET /api/public/invoices/:tenantSlug/:number[/pdf]?k=<clave>` (la clave aleatoria de la orden va en el `publicUrl` de `GET /api/orders/:id/invoice`; sin ella responde 404)
 - **Tenant** `GET|PATCH /api/tenant`, `POST /api/tenant/logo`
 - **Users** `GET /api/users`, `POST /api/users/invite`, `PATCH|DELETE /api/users/:id`
 - **Dashboard** `GET /api/dashboard`
