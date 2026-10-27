@@ -98,7 +98,7 @@ export function OrderDetail() {
         {o.status === "pagada" && can("orders:write") && <Button variant="outline" icon={<ShieldCheck className="h-4 w-4" />} onClick={() => nav("/app/ordenes/nueva", { state: { customerId: o.customerId, vehicleId: o.vehicleId, warrantyOfOrderId: o.id } })}>Nueva orden de garantía</Button>}
       </div>
 
-      <div className="grid md:grid-cols-[1fr_280px] gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-4">
         <div className="space-y-4">
           <Card>
             <div className="flex items-start justify-between gap-3">
@@ -178,7 +178,7 @@ export function OrderDetail() {
               <div className="mt-4 border-t line pt-3 space-y-1 text-sm">
                 <div className="text-xs muted mb-1">Pagos</div>
                 {o.payments!.map((p) => (
-                  <div key={p.id} className="flex justify-between gap-2"><span>{PAYMENT_METHOD_LABEL[p.method]}{p.reference && <span className="muted"> · {p.reference}</span>}{p.voided && <Badge tone="bad" className="ml-1">anulado</Badge>}</span><span className="tabular-nums font-medium">{formatMoney(p.amount)}</span></div>
+                  <div key={p.id} className="flex justify-between gap-2"><span className="min-w-0 break-words">{PAYMENT_METHOD_LABEL[p.method]}{p.reference && <span className="muted"> · {p.reference}</span>}{p.voided && <Badge tone="bad" className="ml-1">anulado</Badge>}</span><span className="tabular-nums font-medium">{formatMoney(p.amount)}</span></div>
                 ))}
               </div>
             )}

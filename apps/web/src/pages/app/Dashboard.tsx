@@ -53,7 +53,7 @@ export function Dashboard() {
             <Stat label="Órdenes abiertas" value={d.openOrders.length} sub={`${d.lowStock.length} productos con stock bajo`} />
           </div>
 
-          <div className="grid lg:grid-cols-[1.4fr_1fr] gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-4">
             <Card>
               <CardTitle action={<Link to="/app/ordenes" className="text-sm font-medium text-motor-dark">Ver todas</Link>}>Órdenes abiertas</CardTitle>
               {d.openOrders.length === 0 ? (

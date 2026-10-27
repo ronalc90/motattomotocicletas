@@ -55,7 +55,7 @@ export function Inventory() {
       {list.isLoading ? <PageLoader /> : !list.data?.items.length ? (
         <EmptyState icon={<Boxes />} title="Sin productos" text={dq || category || low ? "Nada con esos filtros." : "Toma una foto de la etiqueta de tu primer repuesto o créalo a mano."} action={can("inventory:entry") && <Link to="/app/inventario/entrada"><Button icon={<Camera className="h-4 w-4" />}>Entrada por foto</Button></Link>} />
       ) : (
-        <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
           {list.data.items.map((p) => <ProductRow key={p.id} p={p} onClick={() => nav(`/app/inventario/${p.id}`)} />)}
         </ul>
       )}
