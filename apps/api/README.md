@@ -27,7 +27,7 @@ Scripts: `dev`, `build`, `start`, `test` (vitest + supertest + mongodb-memory-se
 | `API_PUBLIC_URL` | Optional; prefix for local `/uploads` URLs when R2 is not configured |
 | `OPENAI_API_KEY` | Enables label OCR (gpt-4o-mini vision), the voice assistant and Whisper transcription. Without it both fall back (deterministic matcher / "IA no configurada") |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_URL` | Cloudflare R2 for uploads. If unset, files are stored in `apps/api/uploads/<tenantId>/` and served at `/uploads` |
-| `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD` | Seed superadmin (defaults `superadmin@motatto.app` / `Motatto2026!`) |
+| `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD` | Seed superadmin (required in production; local development uses dev-only values from `config.ts`) |
 | `SEED_OWNER_PASSWORD` | Password for the demo owner `dirox7@gmail.com` |
 | `SEED_TOKEN` | Enables `POST /api/superadmin/seed-demo` (header `X-Seed-Token`) |
 

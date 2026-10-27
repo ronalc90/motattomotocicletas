@@ -25,6 +25,9 @@ export interface SeedResult {
 
 /** Idempotent demo seed: superadmin + tenant "motatto" with catalog, customer, vehicle and one paid order. */
 export async function runSeed(): Promise<SeedResult> {
+  if (!config.superadminPassword || !config.seedOwnerPassword) {
+    throw new Error("Define SUPERADMIN_PASSWORD y SEED_OWNER_PASSWORD para correr el seed en producción");
+  }
   const result: SeedResult = { superadmin: config.superadminEmail, tenant: "motatto", owner: "dirox7@gmail.com", created: { products: 0, services: 0 } };
 
   if (!(await User.exists({ email: config.superadminEmail }))) {
