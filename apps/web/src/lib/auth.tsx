@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Role, Tenant, User } from "@motatto/shared";
-import { api, tokenStore } from "./api";
+import { api, errorMessage, tokenStore } from "./api";
 
 export interface AuthUser extends User {
   impersonating?: boolean;
@@ -12,6 +12,12 @@ interface AuthState {
   user: AuthUser | null;
   tenant: Tenant | null;
   loading: boolean;
+  /**
+   * /auth/me falló sin que la API rechazara el token (429 por límite de peticiones, sin red,
+   * error 5xx). La sesión se conserva: los guards muestran un aviso y reintentan en vez de
+   * mandar a /login. Solo un 401 cuenta como sesión inválida.
+   */
+  sessionError: string | null;
   /** Role used for permission checks (dueno when impersonating). */
   role: Role | null;
   login: (email: string, password: string) => Promise<{ user: AuthUser; tenant: Tenant | null }>;
@@ -30,11 +36,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [tenant, setTenantState] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState<boolean>(!!tokenStore.get());
+  const [sessionError, setSessionError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!tokenStore.get()) {
       setUser(null);
       setTenantState(null);
+      setSessionError(null);
       setLoading(false);
       return;
     }
@@ -42,13 +50,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const me = await api.get<{ user: AuthUser; tenant: Tenant | null }>("/auth/me");
       setUser(me.user);
       setTenantState(me.tenant);
+      setSessionError(null);
     } catch (e) {
-      const status = (e as { status?: number }).status;
-      if (status === 401) {
+      // Solo un 401 significa token inválido o vencido.
+      if ((e as { status?: number }).status === 401) {
         tokenStore.clear();
         setToken(null);
         setUser(null);
         setTenantState(null);
+        setSessionError(null);
+      } else {
+        // 429, red o servidor caído: el token sigue siendo válido, no se borra.
+        setSessionError(errorMessage(e));
       }
     } finally {
       setLoading(false);
@@ -66,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (u) {
         setUser(u);
         setTenantState(tn ?? null);
+        setSessionError(null);
         setLoading(false);
       } else {
         setLoading(true);
@@ -90,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
     setUser(null);
     setTenantState(null);
+    setSessionError(null);
   }, []);
 
   const exitSupport = useCallback(async () => {
@@ -102,8 +117,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const role: Role | null = user ? (user.impersonating ? (user.effectiveRole ?? "dueno") : user.role) : null;
 
   const value = useMemo<AuthState>(
-    () => ({ token, user, tenant, loading, role, login, setSession, logout, refresh, setTenant: setTenantState, exitSupport }),
-    [token, user, tenant, loading, role, login, setSession, logout, refresh, exitSupport],
+    () => ({ token, user, tenant, loading, sessionError, role, login, setSession, logout, refresh, setTenant: setTenantState, exitSupport }),
+    [token, user, tenant, loading, sessionError, role, login, setSession, logout, refresh, exitSupport],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -1,4 +1,4 @@
-import express from "express";
+import express, { type RequestHandler } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
@@ -25,7 +25,42 @@ import { auditRouter, uploadsRouter } from "./routes/misc.js";
 import { filesRouter } from "./routes/files.js";
 import { superadminRouter } from "./routes/superadmin.js";
 
-export function createApp() {
+/** Peticiones permitidas por IP en cada ventana de 15 minutos. */
+export interface RateLimits {
+  /** /api/auth salvo /me y /logout: login, registro, cambio de contraseña e invitaciones. */
+  credentials: number;
+  /**
+   * GET /api/auth/me, que la web llama en cada carga de página. Es holgado porque los
+   * celulares de un taller suelen salir a internet por la misma IP pública.
+   */
+  session: number;
+  /** /api/public (cuenta de cobro y datos públicos del taller). */
+  public: number;
+}
+
+export const RATE_LIMITS: RateLimits = { credentials: 60, session: 1000, public: 300 };
+// Los tests comparten una app y hacen cientos de peticiones desde 127.0.0.1. Los que
+// prueban los límites crean su propia app con createApp({ rateLimits: RATE_LIMITS }).
+const TEST_RATE_LIMITS: RateLimits = { credentials: 10000, session: 10000, public: 10000 };
+
+// Rutas de /api/auth que no reciben credenciales y no deben gastar ese cupo. /logout no
+// existe hoy (la web cierra sesión borrando su token), pero si se agrega queda aquí.
+const SESSION_PATHS = new Set(["/me", "/logout"]);
+
+function limiter(limit: number): RequestHandler {
+  return rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: { code: "RATE_LIMITED", message: "Demasiadas peticiones desde esta red. Espera unos minutos e intenta de nuevo." } },
+  });
+}
+
+export function createApp(opts: { rateLimits?: Partial<RateLimits> } = {}) {
+  const limits: RateLimits = { ...(config.isTest ? TEST_RATE_LIMITS : RATE_LIMITS), ...opts.rateLimits };
+  const credentialsLimiter = limiter(limits.credentials);
+  const sessionLimiter = limiter(limits.session);
   const app = express();
   app.set("trust proxy", 1);
   app.disable("x-powered-by");
@@ -48,16 +83,18 @@ export function createApp() {
 
   app.get("/health", (_req, res) => res.json({ ok: true, uptime: process.uptime() }));
 
+  // El límite estricto es para quien prueba contraseñas o tokens de invitación. Cualquier
+  // ruta nueva de /api/auth queda en él salvo que se agregue a SESSION_PATHS. El router
+  // ignora mayúsculas y la barra final, así que la comparación también.
   app.use(
     "/api/auth",
-    rateLimit({ windowMs: 15 * 60 * 1000, limit: config.isTest ? 10000 : 60, standardHeaders: true, legacyHeaders: false }),
+    (req, res, next) => {
+      const path = req.path.replace(/\/+$/, "").toLowerCase();
+      return (SESSION_PATHS.has(path) ? sessionLimiter : credentialsLimiter)(req, res, next);
+    },
     authRouter,
   );
-  app.use(
-    "/api/public",
-    rateLimit({ windowMs: 15 * 60 * 1000, limit: config.isTest ? 10000 : 300, standardHeaders: true, legacyHeaders: false }),
-    publicRouter,
-  );
+  app.use("/api/public", limiter(limits.public), publicRouter);
   app.use("/uploads", express.static(uploadsDir, { maxAge: "7d", index: false }));
   app.use("/api/superadmin", superadminRouter);
 
