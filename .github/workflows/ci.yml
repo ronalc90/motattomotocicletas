@@ -1,0 +1,69 @@
+# Integración continua del monorepo: instala dependencias, revisa tipos, corre
+# los tests de la API y compila shared, api y web. No despliega nada ni usa
+# secretos del repositorio.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Solo lectura: la CI no publica, no comenta ni escribe en el repositorio.
+permissions:
+  contents: read
+
+# Un push nuevo a un PR cancela el run anterior de ese mismo PR.
+# En main no se cancela nada: cada commit fusionado queda verificado.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verificar:
+    name: Tipos, tests y build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      # Acciones fijadas por SHA (con la versión al lado) para que una etiqueta
+      # movida no cambie lo que se ejecuta. Dependabot no las actualiza porque
+      # su configuración solo cubre npm y docker.
+      - name: Descargar el código
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Instalar Node 22 con caché de npm
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci --no-audit --no-fund
+
+      # La API y la web importan los tipos desde packages/shared/dist, así que
+      # shared se compila antes de revisar tipos y de correr los tests.
+      - name: Compilar shared
+        run: npm run build -w packages/shared
+
+      - name: Revisar tipos
+        run: npm run typecheck
+
+      # Los tests de la API levantan su propia MongoDB en memoria con
+      # mongodb-memory-server (el binario se descarga en npm ci o al arrancar),
+      # por eso no hace falta un servicio mongo en el job. test/setup.ts define
+      # sus propias variables de entorno de prueba.
+      - name: Tests de la API
+        run: npm test
+
+      - name: Compilar API
+        run: npm run build -w apps/api
+
+      # VITE_API_URL se incrusta en el bundle. Aquí va un dominio ficticio
+      # (el dominio de nivel superior .invalid está reservado y nunca resuelve):
+      # la CI solo comprueba que la web compila. El valor real vive en la
+      # configuración de Vercel y no se usa ni se expone aquí.
+      - name: Compilar web
+        run: npm run build -w apps/web
+        env:
+          VITE_API_URL: https://api.ejemplo.invalid
